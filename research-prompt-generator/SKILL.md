@@ -99,7 +99,13 @@ Parse the request into:
 
 ---
 
-## STEP 1.5: 리서치 유형 분류 (Research Type Classification)
+## STEP 1.5: claude_guide Knowledge Loading
+
+Read all documents in `claude_guide/` directory. Use the knowledge from these documents to enhance the quality of prompts generated in subsequent steps.
+
+---
+
+## STEP 1.6: 리서치 유형 분류 (Research Type Classification)
 
 Classify the request into one of these types. Each uses a different template emphasis:
 

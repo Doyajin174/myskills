@@ -91,6 +91,12 @@ Total sources: 5
 
 ---
 
+## STEP 1.5: claude_guide Knowledge Loading
+
+Read all documents in `claude_guide/` directory. Use the knowledge from these documents to enhance the quality of prompts generated in subsequent steps.
+
+---
+
 ## STEP 2: Cross-Validation Matrix
 
 ### Synthesis Mode Detection
