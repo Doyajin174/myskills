@@ -1,266 +1,235 @@
 ---
 name: guide
 description: >
-  Adaptive task orchestration skill. Classifies complexity via risk/ambiguity/coupling
-  (not file count), selects pipeline depth, generates structured subagent prompts,
-  dispatches with specialized agent types, and handles failure recovery.
-  Use when the user wants to implement any feature or task via subagent dispatch.
+  Batch prompt compiler — reads entire claude_guide knowledge base and generates
+  enriched prompts for ALL skills in a pipeline plan at once. Called once at pipeline
+  start by orchestrator. Does NOT implement, execute code, or dispatch subagents.
+  MUST trigger on: orchestrator delegation for prompt enrichment at pipeline start.
+allowed-tools: Read, Glob, Grep, Write
 ---
 
-# Adaptive Guide v2 — Task Orchestration & Subagent Dispatch
+# Guide — Batch Prompt Compiler
 
-**Announce at start:** "I'm using the /guide skill to build an adaptive pipeline for your request."
+**Announce at start:** "I'm using the /guide skill to compile enriched prompts for the pipeline."
 
-**Core philosophy:** Bounded implement→verify micro-loops, not big-bang. Risk-aware classification, not file counting. Fail fast and recover, don't loop forever.
+Read the entire claude_guide knowledge base once, then generate tailored enriched prompts for every skill in the pipeline plan. Called **once** at pipeline start — not per-skill.
 
----
-
-## STEP 0: 요청 파악 + 프로젝트 컨텍스트
-
-1. Parse `$ARGUMENTS` to understand user's request
-2. Explore `claude_guide/` for relevant documents (hooks, skills, conventions)
-3. Read root `CLAUDE.md` for project-specific rules and constraints
-4. Check execution memory (`guide_memory.md`) for past patterns on similar tasks
-5. Summarize findings internally — do NOT dump raw file content forward
-
----
-
-## STEP 1: 복잡도 분류 (Risk-Driven Classification)
-
-Classify by **risk → ambiguity → verification → coupling → file count** (in that order).
-
-### Phase 1: Requirement Clarity
+**Pipeline position:**
 ```
-Are acceptance criteria clearly defined?
-├─ NO → EXPLORATORY
-└─ YES → continue
+orchestrator: "결제 시스템 구현해줘"
+    ↓ plans: [question, result, research, result, spec, implementer]
+    ↓
+/guide ← YOU ARE HERE (1회만 호출)
+    1. Parse pipeline plan
+    2. Read ALL claude_guide/ docs (25개)
+    3. Read project context
+    4. Classify complexity
+    5. Generate enriched prompt per skill
+    6. Save all to docs/prompts/cache/
+    ↓
+orchestrator → question(enriched) → result → research(enriched) → ...
+    (guide 재호출 없이 파이프라인 완주)
 ```
-
-### Phase 2: Risk Assessment
-```
-Does change touch: DB schema, auth/permissions, public API contracts,
-production config, destructive operations, or payment/billing?
-├─ YES → add HIGH_RISK tag (forces approval gate regardless of complexity)
-└─ NO → continue
-```
-
-### Phase 3: Verification Feasibility
-```
-Can the change be verified by automated tests or clear manual steps?
-├─ NO → bump complexity +1 level
-└─ YES → continue
-```
-
-### Phase 4: Change Coupling
-```
-Is the change isolated to a single module/boundary?
-├─ YES, describable in one sentence → TRIVIAL
-├─ YES, within one module → SIMPLE
-├─ NO, crosses module boundaries → MEDIUM
-└─ NO, crosses multiple interfaces/contracts → COMPLEX
-```
-
-### Phase 5: Adjust (secondary signals)
-- File count > 10 → bump +1 if not already COMPLEX
-- Unknown dependency graph → bump +1
-- Default under uncertainty → MEDIUM
-
-### Mid-Flight Reclassification
-After Research phase completes, reassess:
-- Scope smaller than expected → downgrade (e.g., MEDIUM → SIMPLE)
-- Hidden complexity discovered → upgrade (e.g., SIMPLE → COMPLEX)
-- Ambiguity remains → switch to EXPLORATORY
 
 ---
 
-## STEP 2: 파이프라인 선택
+## STEP 0: Parse Pipeline Plan
 
-| Complexity | Pipeline |
-|------------|----------|
-| **Trivial** | Scope → Implement → Verify |
-| **Simple** | Scope → Light Design → [Implement→Verify]ⁿ → Final Verify |
-| **Medium** | Scope → Research → Design → [Implement→Verify]ⁿ → Final Verify |
-| **Complex** | Scope → Parallel Research → Design + APPROVAL GATE → [Maker→Reviewer]ⁿ → Integration Verify |
-| **Exploratory** | Scope → Research Loop → Structured Report → STOP |
+Extract from orchestrator's args:
+- **Pipeline plan:** ordered list of skills to be used (e.g., `[question, result, research, spec, implementer]`)
+- **Original request:** user's raw request
+- **Goal:** what the user wants to achieve (1 sentence)
 
-**HIGH_RISK tag** → forces APPROVAL GATE after Design, regardless of complexity level.
-
-### Implement→Verify Loop Rules
-- **Max retries:** 3 per step. After 3 failed verify cycles:
-  1. Revert changes (`git checkout` the affected files)
-  2. Summarize what was attempted and why it failed
-  3. Report dead-end to user with options: retry differently, adjust scope, or abort
-- **Partial success:** If 3/4 steps pass but 1 fails, commit passing work, isolate failure.
-
-### Complex: Maker→Reviewer Pattern
-For COMPLEX tasks, split implement and verify across different agents:
-1. **Maker Agent** — writes the code
-2. **Reviewer Agent** — given original scope + maker's output, writes failing tests, finds edge cases, checks for regressions
-This prevents confirmation bias (the author is blind to their own mistakes).
+If pipeline plan is missing, ask orchestrator to provide it.
 
 ---
 
-## STEP 3: 서브에이전트 프롬프트 생성
+## STEP 1: Read Knowledge Base
 
-Generate a structured prompt for the subagent. **Sections are tiered by complexity:**
+Read **ALL** claude_guide/ documents (25개). This is the only skill that reads the full knowledge base.
 
-### Always Required (all complexity levels)
-```xml
-<context>{project rules from CLAUDE.md, relevant architecture}</context>
-<goal>{what to achieve, acceptance criteria}</goal>
-<constraints>{non-negotiable limits, safety rules}</constraints>
-<output>{expected deliverables, file list}</output>
-<verification>{how to confirm success — tests, commands, checks}</verification>
+```
+Read: claude_guide/*.md (all 25 documents)
 ```
 
-### Add for MEDIUM+ only
-```xml
-<risks>{edge cases, blast radius, rollback plan}</risks>
-<parallel>{which portions can run independently, dependency boundaries}</parallel>
-```
+Extract and synthesize:
+- Claude Code best practices relevant to the project
+- Skill authoring conventions
+- Workflow patterns
+- Tool usage guidelines
+- Code quality standards
 
-### Add for COMPLEX only
-```xml
-<approval_gate>{what needs user confirmation before proceeding}</approval_gate>
-<recovery>{max retries, rollback triggers, escalation path}</recovery>
-<alternatives>{list 2-3 approaches, critique each, justify chosen one}</alternatives>
-```
-
-### Structural Thinking Directives (replace "think hard/ultrathink")
-
-Instead of abstract keywords, specify concrete reasoning requirements:
-- **Research phase:** "List what you found AND what you didn't find. Flag assumptions."
-- **Design phase:** "Describe 2-3 alternative approaches. Critique each. Justify your choice."
-- **Implement phase:** "After each file change, verify no raw values/broken imports before moving on."
-- **Verify phase:** "If test fails, diagnose root cause before retrying. Don't guess-fix."
-
-### Context Management
-- At **phase boundaries**: summarize findings, discard raw file contents
-- Retain: function signatures, interface contracts, error messages, decisions made
-- Discard: implementation boilerplate, unchanged file contents, verbose logs
-- If context feels heavy: synthesize into a brief before continuing
+**Do NOT dump raw content.** Synthesize into actionable knowledge organized by relevance to different skill types.
 
 ---
 
-## STEP 4: 유저에게 보고 + 확인
+## STEP 2: Read Project Context
 
-Present a summary to the user before execution:
+Gather project-specific context:
 
-```
-📋 태스크: [task description]
-📊 복잡도: [TRIVIAL/SIMPLE/MEDIUM/COMPLEX/EXPLORATORY] [+HIGH_RISK if applicable]
-🔧 파이프라인: [selected pipeline phases]
+| Source | What to Extract |
+|--------|----------------|
+| `CLAUDE.md` | Project rules, architecture, constraints |
+| `package.json` | Tech stack, dependencies, versions |
+| Relevant source files | Current implementation shape (brief) |
+| `docs/specs/` | Active specifications |
+| `docs/reports/` | Prior research/synthesis reports |
 
-Phase 1 ([name]): [brief description]
-Phase 2 ([name]): [brief description]
-...
-
-실행할까요?
-```
-
-**Wait for user confirmation before proceeding.**
+**Summarize** project context in 5-10 sentences. Do not include full file contents.
 
 ---
 
-## STEP 5: 서브에이전트 디스패치
+## STEP 3: Classify Complexity
 
-### Agent Type Selection
+Assess the overall task complexity using risk-driven classification:
 
-| Phase | Agent Type | Reasoning |
-|-------|-----------|-----------|
-| Research / Exploration | `subagent_type: "Explore"` | Read-only, fast, broad search |
-| Design / Planning | `subagent_type: "Plan"` | Architecture decisions, no code changes |
-| Implementation | `subagent_type: "general-purpose"` or specialized | Code changes, full tool access |
-| Review (Complex) | `subagent_type: "superpowers:code-reviewer"` | Adversarial review of implementation |
+| Level | Criteria |
+|-------|----------|
+| **TRIVIAL** | 1 file, <20 LOC, no deps/DB/arch changes |
+| **SIMPLE** | Single module, multiple functions |
+| **MEDIUM** | Crosses module boundaries |
+| **COMPLEX** | Multiple interfaces/contracts affected |
 
-### Dispatch Strategy
-
-| Complexity | Strategy |
-|------------|----------|
-| **Trivial / Simple** | Single agent with lightweight prompt |
-| **Medium** | Single agent with full prompt (internal loops) |
-| **Complex** | Phase-split: Explore agent → Plan agent → Implement agent(s) → Reviewer agent |
-| **Exploratory** | Explore agent only → structured report → user decides |
-
-### Parallel Execution Rules
-Parallel agents are allowed ONLY when tasks are in **separate dependency boundaries**:
-- Different files that DON'T import from each other ✅
-- Different modules with no shared interfaces ✅
-- Same file ❌
-- Different files that share an interface/contract ❌
-- Files where one imports from the other ❌
-
-When in doubt, run sequentially.
+Include complexity in every enriched prompt so downstream skills can adjust their behavior.
 
 ---
 
-## STEP 6: 결과 보고
+## STEP 4: Generate Enriched Prompts
 
-### Summary Format
+For **each skill** in the pipeline plan, generate a tailored enriched prompt:
+
+### Per-skill enriched prompt structure:
+
+```markdown
+---
+target_skill: [skill name]
+pipeline_id: [goal-slug-date]
+task_hash: [sha256(original_request + target_skill)]
+complexity: [TRIVIAL/SIMPLE/MEDIUM/COMPLEX]
+created: [YYYY-MM-DD]
+pipeline_plan: [full ordered list]
+current_position: [N of M]
+---
+
+## Original Request
+[User's request — enriched and clarified]
+
+## Project Context
+[Summarized project info relevant to THIS skill's role]
+
+## Relevant Knowledge
+[claude_guide knowledge specifically useful for this skill]
+- [Best practice 1 relevant to this skill's task]
+- [Convention 2 relevant to this skill's task]
+- [Pattern 3 relevant to this skill's task]
+
+## Task for This Skill
+[What this specific skill should focus on, given the overall pipeline context]
+
+## Complexity & Constraints
+- Overall complexity: [level]
+- This skill's scope: [what it handles vs what other skills handle]
+- Constraints: [from CLAUDE.md and project rules]
+
+## Prior Context (if any)
+[References to previous pipeline artifacts — specs, reports, scan results]
 ```
-📊 실행 결과: [task description]
-복잡도: [level] | 파이프라인: [phases executed]
 
-## What Changed
-[1-3 sentences: what was done and why]
+### Knowledge distribution rules:
 
-## Files Modified
-- path/to/file.py — [what changed]
-- path/to/other.py — [what changed]
+| Skill Type | Knowledge Focus |
+|------------|----------------|
+| question, research | 기술 탐색 패턴, 비교 분석 방법, 트렌드 조사 |
+| spec | 스펙 작성 규칙, 수용기준 설계, 의사결정 구조 |
+| implementer | 코드 품질, 빌드 체크, git 워크플로우, 테스트 패턴 |
+| validation | 리뷰 기준, 보안 체크, 아키텍처 평가 |
+| problem | 디버깅 패턴, 정적 분석, 근본 원인 추적 |
+| scanner | 레퍼런스 탐색, AST 도구, 의존성 분석 |
+| migration | 빌드 체크 루프, leaf-first 순서, 체크포인트 |
+| result | 크로스 검증, 합의 도출, 신뢰도 평가 |
 
-## Verification
-- [test/check name]: ✅ passed / ❌ failed
-- [test/check name]: ✅ passed / ❌ failed
-
-## Remaining Issues
-- [any unresolved items, or "None"]
-```
-
-For COMPLEX tasks, include the step-by-step table:
-```
-| Step | Status | Details |
-|------|--------|---------|
-| Research | ✅ | [brief] |
-| Design | ✅ | [brief] |
-| Implement 1 | ✅ | [brief] |
-| Review | ⚠️ | [issues found] |
-| Fix | ✅ | [resolved] |
-```
-
-**On failure:** Report what was attempted, what failed, revert if needed, present options:
-1. Retry with adjusted approach
-2. Reduce scope
-3. Abort and revert
+**Not every skill needs all 25 docs' knowledge.** Distribute only what's relevant.
 
 ---
 
-## STEP 7: 실행 메모리 업데이트 (Execution Memory)
+## STEP 5: Save Enriched Prompts
 
-After each completed execution, append one line to `guide_memory.md`:
-
+Save each enriched prompt to:
 ```
-[date] | [complexity] | [task summary] | [pipeline used] | [result: success/partial/fail] | [lesson]
-```
-
-Example:
-```
-2026-03-20 | MEDIUM | STT accuracy improvement | Research→Design→Implement×6→Verify | success | RMS normalization + domain dictionary worked well as parallel changes
-2026-03-20 | SIMPLE | Add collect_stt.py | Design→Implement→Verify | success | Reusing VAD logic from local.py saved time
+docs/prompts/cache/enriched-for-{skill_name}.md
 ```
 
-- Keep only the **last 20 entries**
-- Read this file in STEP 0 to inform classification and pipeline selection
-- If a similar task previously failed, flag the failure pattern before proceeding
+Example for a pipeline `[question, research, spec, implementer]`:
+```
+docs/prompts/cache/enriched-for-question.md
+docs/prompts/cache/enriched-for-research.md
+docs/prompts/cache/enriched-for-spec.md
+docs/prompts/cache/enriched-for-implementer.md
+```
 
 ---
 
-## Anti-Pattern Prevention
+## STEP 6: Update Pipeline State
 
-Include these rules in every subagent prompt:
-- **No big-bang implementation** — small bounded steps, verify between each
-- **No rigid pipeline** — skip/merge phases when complexity allows
-- **No guess-fixing** — diagnose root cause before attempting a fix
-- **No context hoarding** — summarize at boundaries, discard raw data
-- **No implementation under uncertainty** — EXPLORATORY produces research, not code
-- **No infinite retry** — 3 strikes then revert and escalate
-- **No same-boundary parallel** — check dependency graph before parallelizing
+Update `.claude/pipeline-state.md`:
+
+```yaml
+enriched_prompts:
+  question: docs/prompts/cache/enriched-for-question.md
+  research: docs/prompts/cache/enriched-for-research.md
+  spec: docs/prompts/cache/enriched-for-spec.md
+  implementer: docs/prompts/cache/enriched-for-implementer.md
+```
+
+Report to user:
+```
+Enriched prompts generated for [N] skills:
+- question: [1-line summary of focus]
+- research: [1-line summary of focus]
+- spec: [1-line summary of focus]
+- implementer: [1-line summary of focus]
+
+Complexity: [level]
+Orchestrator will proceed with the pipeline.
+```
+
+---
+
+## Quality Checklist
+
+### Must-pass
+- [ ] ALL 25 claude_guide docs read
+- [ ] Project context gathered (CLAUDE.md + deps)
+- [ ] Complexity classified
+- [ ] Enriched prompt generated for EACH skill in pipeline plan
+- [ ] Each enriched prompt has YAML frontmatter (target_skill, pipeline_id, task_hash)
+- [ ] Each enriched prompt has relevant (not all) claude_guide knowledge
+- [ ] Files saved to docs/prompts/cache/
+- [ ] Pipeline state updated with enriched_prompts map
+
+### Should-pass
+- [ ] Knowledge distribution matches skill type table
+- [ ] Prior artifacts referenced (specs, reports) if they exist
+- [ ] Complexity rationale included in each enriched prompt
+
+---
+
+## Anti-Patterns
+
+- **Writing code**: guide generates prompts, not code. If you're about to use Edit or Bash → STOP.
+- **Dispatching agents**: guide does NOT use Agent tool. That's implementer's job.
+- **Selective reading**: Read ALL 25 docs. Don't skip based on title — relevance is determined after reading.
+- **Dumping raw docs**: Synthesize, don't copy-paste. Each enriched prompt should contain distilled knowledge.
+- **One-size-fits-all**: Each skill gets a DIFFERENT enriched prompt. Don't generate identical content for all.
+- **Ignoring pipeline position**: Each enriched prompt should note where the skill sits in the pipeline and what comes before/after.
+- **Forgetting degraded mode exists**: Other skills can run without enriched prompts. Guide is an enhancer, not a gatekeeper.
+
+---
+
+## Pipeline State Update
+
+If `.claude/pipeline-state.md` exists, update it before concluding:
+
+1. YAML frontmatter: set `delegated_to:` to empty, update `updated:` to today
+2. Add `enriched_prompts:` map to frontmatter
+3. Markdown body: add `guide` to **Completed**, update **Artifacts** with cache file paths, set **Recommended Next** to first skill in pipeline plan
