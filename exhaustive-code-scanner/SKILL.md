@@ -27,7 +27,7 @@ User: "이 시스템 쓰는 데가 어디야?"
     5. Classify + dependency graph
     6. Confidence score + manual checklist
     ↓
-Output: scan-report.md → /code-migration or /guide
+Output: scan-report.md → /code-migration or /implementer
 ```
 
 ---
@@ -329,4 +329,4 @@ Save to `docs/reports/{topic}-scan-report.md`:
 If `.claude/pipeline-state.md` exists, update it before concluding:
 
 1. YAML frontmatter: set `delegated_to:` to empty, update `updated:` to today
-2. Markdown body: add `scanner` to **Completed**, update **Artifacts** with scan report path, set **Recommended Next** to `/code-migration, /guide`
+2. Markdown body: add `scanner` to **Completed**, update **Artifacts** with scan report path, set **Recommended Next** to `/code-migration, /implementer`
