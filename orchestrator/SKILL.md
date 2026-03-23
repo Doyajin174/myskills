@@ -172,6 +172,8 @@ After user confirms, do exactly TWO things:
 | /problem | `problem-prompt-generator` |
 | /writing-plans | `writing-plans` |
 | /finishing | `finishing-a-development-branch` |
+| /scanner | `exhaustive-code-scanner` |
+| /code-migration | `code-migration` |
 
 ---
 

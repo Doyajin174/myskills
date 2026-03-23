@@ -14,6 +14,8 @@
 | /problem | `problem-prompt-generator` | 버그, 에러, 예상과 다른 동작. "안돼", "에러", "버그" | 원인 분석 + 수정 완료 | /validation (재검증), /research (설계 결함), /guide (수정 구현) |
 | /writing-plans | `writing-plans` | 설계 완료, 엔지니어용 상세 구현 계획 필요. "구현 계획 짜줘", "플랜 만들어" | 구현 계획 문서 생성 | /guide |
 | /finishing | `finishing-a-development-branch` | 구현 완료 + 테스트 통과. "머지", "PR 만들어", "정리" | 브랜치 정리/머지/PR 완료 | (pipeline 종료) |
+| /scanner | `exhaustive-code-scanner` | 특정 시스템/심볼의 모든 레퍼런스 탐색 필요. "스캔", "다 찾아", "어디서 쓰이나", "임팩트" | scan-report.md 생성 (레퍼런스 맵 + 의존성 그래프 + 신뢰도) | /code-migration, /guide |
+| /code-migration | `code-migration` | scan-report 존재 + 시스템 A→B 교체 실행. "마이그레이션", "교체", "갈아끼우기" | 마이그레이션 완료 + migration-report.md | /validation, /problem |
 
 ## Direct Route Shortcuts
 
