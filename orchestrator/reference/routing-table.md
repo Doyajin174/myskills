@@ -12,6 +12,8 @@
 | /guide | `guide` | 구현 준비 완료 (스펙 또는 명확한 요청 존재) | 코드 구현 + 검증 완료 | /validation, /problem |
 | /validation | `validation-prompt-generator` | 구현 완료, 품질 검증 필요. "리뷰해줘", "괜찮아?" | 품질 평가 리포트 생성 | /finishing (ship), /problem (버그), /guide (재작업), /research (설계 결함) |
 | /problem | `problem-prompt-generator` | 버그, 에러, 예상과 다른 동작. "안돼", "에러", "버그" | 원인 분석 + 수정 완료 | /validation (재검증), /research (설계 결함), /guide (수정 구현) |
+| /writing-plans | `writing-plans` | 설계 완료, 엔지니어용 상세 구현 계획 필요. "구현 계획 짜줘", "플랜 만들어" | 구현 계획 문서 생성 | /guide |
+| /finishing | `finishing-a-development-branch` | 구현 완료 + 테스트 통과. "머지", "PR 만들어", "정리" | 브랜치 정리/머지/PR 완료 | (pipeline 종료) |
 
 ## Direct Route Shortcuts
 

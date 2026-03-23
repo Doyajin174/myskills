@@ -334,7 +334,7 @@ This routing is not optional. Every validation MUST end with an explicit next st
 If `.claude/pipeline-state.md` exists, update it before concluding:
 
 1. YAML frontmatter: set `delegated_to:` to empty, update `updated:` to today
-2. Markdown body: add `validation` to **Completed**, update **Artifacts** with generated files, set **Recommended Next** to `/finishing, /problem, /guide`
+2. Markdown body: add `validation` to **Completed**, update **Artifacts** with generated files, set **Recommended Next** to `/finishing, /problem, /guide, /research`
 
 ---## Anti-Patterns
 

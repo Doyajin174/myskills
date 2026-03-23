@@ -336,7 +336,7 @@ Final synthesis:
 If `.claude/pipeline-state.md` exists, update it before concluding:
 
 1. YAML frontmatter: set `delegated_to:` to empty, update `updated:` to today
-2. Markdown body: add `problem` to **Completed**, update **Artifacts** with generated files, set **Recommended Next** to `/validation, /guide`
+2. Markdown body: add `problem` to **Completed**, update **Artifacts** with generated files, set **Recommended Next** to `/validation, /research, /guide`
 
 ---## Anti-Patterns
 

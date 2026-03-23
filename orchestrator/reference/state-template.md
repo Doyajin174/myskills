@@ -111,8 +111,8 @@ updated: 2026-03-23
 
 ## State Ownership
 
-- **Orchestrator writes:** `stage`, `delegated_to`, `visit_count`, `updated`, `Goal`, `Recommended Next`
-- **Orchestrator reconciles:** `Completed` (from `delegated_to`), `Artifacts` (from Glob scan)
-- **Key Decisions:** Updated by orchestrator based on user conversation context
-
-Worker skills do NOT directly write to this file. The orchestrator is the sole owner of pipeline state.
+- **Orchestrator writes (pre-dispatch):** `stage`, `delegated_to`, `visit_count`, `updated`, `Goal`
+- **Worker skill writes (post-completion):** `Completed` (자기 이름 추가), `Artifacts` (생성 파일), `Recommended Next` (라우팅 테이블 기반)
+- **Worker skill clears:** `delegated_to` → 비움
+- **Key Decisions:** Worker skill이 발견한 핵심 결정사항 추가
+- **Orchestrator fallback:** Worker가 state를 안 쓴 경우, STEP 1에서 Glob 기반으로 reconcile
