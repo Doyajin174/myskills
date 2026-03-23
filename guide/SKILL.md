@@ -348,6 +348,15 @@ Example:
 
 ---
 
+## Pipeline State Update
+
+If `.claude/pipeline-state.md` exists, update it before concluding:
+
+1. YAML frontmatter: set `delegated_to:` to empty, update `updated:` to today
+2. Markdown body: add `guide` to **Completed**, update **Artifacts** with modified/created files, set **Recommended Next** to `/validation, /problem`
+
+---
+
 ## Anti-Pattern Prevention
 
 Include these rules in every subagent prompt:

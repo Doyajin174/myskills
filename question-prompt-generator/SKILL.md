@@ -276,6 +276,15 @@ After receiving external AI responses + internal findings:
 
 ---
 
+## Pipeline State Update
+
+If `.claude/pipeline-state.md` exists, update it before concluding:
+
+1. YAML frontmatter: set `delegated_to:` to empty, update `updated:` to today
+2. Markdown body: add `question` to **Completed**, update **Artifacts** with generated report/prompt files, set **Recommended Next** to `/result, /research`
+
+---
+
 ## Anti-Patterns
 
 - **Already decided**: "AudioWorklet으로 하려는데" → redirect to `/research`

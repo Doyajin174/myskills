@@ -327,7 +327,14 @@ Agent 4 — IMPLEMENTATION (code patterns) [optional, for Architecture/Best Prac
 
 ---
 
-## Anti-Patterns
+## Pipeline State Update
+
+If `.claude/pipeline-state.md` exists, update it before concluding:
+
+1. YAML frontmatter: set `delegated_to:` to empty, update `updated:` to today
+2. Markdown body: add `research` to **Completed**, update **Artifacts** with generated files, set **Recommended Next** to `/result, /spec`
+
+---## Anti-Patterns
 
 - **Vague context**: "We have a voice app" → include architecture, versions, constraints
 - **Open-ended questions**: "What should we use?" → specify criteria and constraints

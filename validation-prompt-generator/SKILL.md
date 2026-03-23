@@ -329,7 +329,14 @@ This routing is not optional. Every validation MUST end with an explicit next st
 
 ---
 
-## Anti-Patterns
+## Pipeline State Update
+
+If `.claude/pipeline-state.md` exists, update it before concluding:
+
+1. YAML frontmatter: set `delegated_to:` to empty, update `updated:` to today
+2. Markdown body: add `validation` to **Completed**, update **Artifacts** with generated files, set **Recommended Next** to `/finishing, /problem, /guide`
+
+---## Anti-Patterns
 
 - **Rubber stamp**: "Looks good" without evidence — always find at least one improvement
 - **Style policing**: Focus on bugs/security/architecture, not formatting

@@ -284,7 +284,14 @@ Options:
 
 ---
 
-## Anti-Patterns
+## Pipeline State Update
+
+If `.claude/pipeline-state.md` exists, update it before concluding:
+
+1. YAML frontmatter: set `delegated_to:` to empty, update `updated:` to today
+2. Markdown body: add `result` to **Completed**, update **Artifacts** with generated files, set **Recommended Next** to `/spec, /guide`
+
+---## Anti-Patterns
 
 - **Cherry-picking**: Don't only include findings that support one option
 - **False consensus**: 2 AI tools parroting the same blog post ≠ independent confirmation

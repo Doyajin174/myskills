@@ -258,7 +258,14 @@ IF user wants quality review of an existing artifact:
 
 ---
 
-## Anti-Patterns
+## Pipeline State Update
+
+If `.claude/pipeline-state.md` exists, update it before concluding:
+
+1. YAML frontmatter: set `delegated_to:` to empty, update `updated:` to today
+2. Markdown body: add `spec` to **Completed**, update **Artifacts** with generated files, set **Recommended Next** to `/guide`
+
+---## Anti-Patterns
 
 - **Spec as wishlist**: Every item must be a locked decision or explicitly OPEN with fallback
 - **Vague acceptance criteria**: "잘 작동함" → "localhost:8084에서 브라우저 마이크로 STT 동작"
