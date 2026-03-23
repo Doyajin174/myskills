@@ -174,6 +174,7 @@ After user confirms, do exactly TWO things:
 | /finishing | `finishing-a-development-branch` |
 | /scanner | `exhaustive-code-scanner` |
 | /code-migration | `code-migration` |
+| /implementer | `implementer` |
 
 ---
 

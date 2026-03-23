@@ -15,6 +15,9 @@ delegated_to: [마지막으로 호출한 스킬 — 완료 시 orchestrator가 r
 visit_count:
   [skill_name]: [N]
 updated: [YYYY-MM-DD]
+pipeline_plan: [스킬 실행 순서 — orchestrator가 계획 시 기록]
+enriched_prompts:
+  [skill_name]: [enriched prompt 파일 경로]
 ---
 ## Pipeline State
 - **Goal:** [사용자의 원래 요청 — 1줄]

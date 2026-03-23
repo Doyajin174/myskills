@@ -83,9 +83,18 @@ Rules:
 
 ---
 
-## STEP 1.5: claude_guide Knowledge Loading
+## Context Mode Detection
 
-Read all documents in `claude_guide/` directory. Use the knowledge from these documents to enhance the quality of prompts generated in subsequent steps.
+Check how this skill was invoked:
+
+**Full mode** (via orchestrator pipeline):
+- IF args contain `enriched_prompt:` path → Read the enriched prompt file and use as primary context
+- This enriched prompt already contains claude_guide knowledge, project context, and complexity analysis
+
+**Degraded mode** (direct invocation):
+- IF no enriched prompt → Read `claude_guide/INDEX.md` and select 1-2 relevant documents
+- Load only those selected documents for lightweight context
+- Note: "Running in standalone mode. For best results, use /orchestrator."
 
 ---
 
