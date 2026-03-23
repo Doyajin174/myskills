@@ -10,7 +10,7 @@
 | /result | `result-synthesizer` | 내부 조사 결과 + 외부 AI 응답 존재. "종합해줘", "결과 정리" | 합성 리포트 생성, 접근법 결정됨 | /spec, /research (더 조사 필요 시), /guide (SIMPLE 시) |
 | /spec | `spec-generator` | 접근법 결정됨, 구현 스펙 확정 필요. "만들 거 정리", "스펙" | 스펙 문서 생성 (`docs/specs/`) | /guide, /research (미결정 사항 多), /problem, /validation |
 | /guide | `guide` | 구현 준비 완료 (스펙 또는 명확한 요청 존재) | 코드 구현 + 검증 완료 | /validation, /problem |
-| /validation | `validation-prompt-generator` | 구현 완료, 품질 검증 필요. "리뷰해줘", "괜찮아?" | 품질 평가 리포트 생성 | /finishing-a-development-branch (ship), /problem (버그), /guide (재작업), /research (설계 결함) |
+| /validation | `validation-prompt-generator` | 구현 완료, 품질 검증 필요. "리뷰해줘", "괜찮아?" | 품질 평가 리포트 생성 | /finishing (ship), /problem (버그), /guide (재작업), /research (설계 결함) |
 | /problem | `problem-prompt-generator` | 버그, 에러, 예상과 다른 동작. "안돼", "에러", "버그" | 원인 분석 + 수정 완료 | /validation (재검증), /research (설계 결함), /guide (수정 구현) |
 
 ## Direct Route Shortcuts
@@ -19,22 +19,26 @@ These bypass the normal pipeline when the situation is clear:
 
 | Situation | Direct Route | Reason |
 |-----------|-------------|--------|
-| 단순 구현 (single file, obvious) | → /guide | 리서치/스펙 불필요 |
+| TRIVIAL 구현 (1 file, <20 LOC, no deps/DB/arch) | → /guide | 리서치/스펙 불필요 |
 | 명확한 버그 + 에러 메시지 | → /problem | 탐색 불필요 |
 | 사용자가 스킬 직접 지명 | → 해당 스킬 | 사용자 의도 존중 |
-| "다음" / "계속" | → state file의 Next Candidates | 파이프라인 재개 |
+| "다음" / "계속" | → state file의 Recommended Next | 파이프라인 재개 |
 
 ## Classification Signals
 
 ### /brainstorming signals
+- **핵심 구분: 목표 자체가 불명확 — 뭘 만들지 모름**
 - "~하면 좋겠다", "아이디어", "뭔가", "어떤 게 좋을까"
 - No specific module, file, or feature mentioned
 - Exploring possibilities, not executing
+- 예: "앱 성능을 올려야 하는데 뭘 먼저 할까?", "내 앱이 뭔가 부족한데 뭔지 모르겠다"
 
 ### /question signals
+- **핵심 구분: 목표는 명확, 접근법만 불명확 — 뭘 만들지는 알지만 어떻게를 모름**
 - "어떻게 만들지", "뭘 써야해", "옵션", "방법", "기술 스택"
 - Has a goal but no chosen technology/approach
 - Wants landscape exploration
+- 예: "실시간 알림 기능 만들려는데 뭘 써야 해?", "로그인은 어떻게 구현하지?"
 
 ### /research signals
 - Specific technology named: "Stripe 조사", "WebSocket vs SSE 비교"
@@ -65,3 +69,13 @@ These bypass the normal pipeline when the situation is clear:
 - "안돼", "에러", "버그", "깨졌", "크래시", "느려"
 - Error messages or stack traces present
 - Something was working and now isn't
+
+## Out of Scope (라우팅 금지)
+
+이 요청들은 어떤 스킬에도 라우팅하지 않는다. Rule 8, 9에 따라 처리:
+
+| Category | Signal | Action |
+|----------|--------|--------|
+| **메타/자기참조** | "이 프롬프트를", "orchestrator를", "라우팅 정책" | 거부: "라우팅 범위 밖입니다. /validation을 직접 호출해주세요." |
+| **비개발 요청** | "날씨", "번역", 일반 대화 | 거부: "개발 워크플로우 전용입니다." |
+| **목적 없는 탐색** | "코드 읽어봐", "설명해줘" (구체적 목적 없이) | 재질문: "어떤 목적으로 봐야 할까요?" → 해당 스킬로 |
