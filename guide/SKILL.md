@@ -1,228 +1,166 @@
 ---
 name: guide
 description: >
-  Batch prompt compiler — reads entire claude_guide knowledge base and generates
-  enriched prompts for ALL skills in a pipeline plan at once. Called once at pipeline
-  start by orchestrator. Does NOT implement, execute code, or dispatch subagents.
-  MUST trigger on: orchestrator delegation for prompt enrichment at pipeline start.
-allowed-tools: Read, Glob, Grep, Write
+  Pipeline bootstrap compiler. Reads claude_guide/ reference documents and
+  project CLAUDE.md, then generates skill-specific enriched prompt files for
+  downstream skills. Called once per pipeline by orchestrator before any other skill.
+  Outputs enriched prompt files to .claude/enriched/.
+  State routing: orchestrator bootstrap gate triggers this automatically for multi-skill pipelines.
+  If implementation needed → /implementer. If bug found → /problem.
+allowed-tools: Read, Write, Glob
 ---
 
-# Guide — Batch Prompt Compiler
+# Guide — Pipeline Prompt Compiler
 
-**Announce at start:** "I'm using the /guide skill to compile enriched prompts for the pipeline."
+**Announce at start:** "I'm using the /guide skill to compile enriched prompts for this pipeline."
 
-Read the entire claude_guide knowledge base once, then generate tailored enriched prompts for every skill in the pipeline plan. Called **once** at pipeline start — not per-skill.
+파이프라인 시작 시 1회 호출. claude_guide/ 문서를 읽고 후속 스킬별 enriched prompt 파일을 생성.
 
 **Pipeline position:**
 ```
-orchestrator: "결제 시스템 구현해줘"
-    ↓ plans: [question, result, research, result, spec, implementer]
-    ↓
-/guide ← YOU ARE HERE (1회만 호출)
-    1. Parse pipeline plan
-    2. Read ALL claude_guide/ docs (25개)
-    3. Read project context
-    4. Classify complexity
-    5. Generate enriched prompt per skill
-    6. Save all to docs/prompts/cache/
-    ↓
-orchestrator → question(enriched) → result → research(enriched) → ...
-    (guide 재호출 없이 파이프라인 완주)
+orchestrator → /guide  ← YOU ARE HERE (1회 bootstrap)
+                  ↓
+                /question → /result → /research → /spec
+                                                    ↓
+                                                /implementer → /validation → /finishing
 ```
 
----
-
-## STEP 0: Parse Pipeline Plan
-
-Extract from orchestrator's args:
-- **Pipeline plan:** ordered list of skills to be used (e.g., `[question, result, research, spec, implementer]`)
-- **Original request:** user's raw request
-- **Goal:** what the user wants to achieve (1 sentence)
-
-If pipeline plan is missing, ask orchestrator to provide it.
+**Core philosophy:** Read once, enrich many. 각 스킬이 매번 claude_guide를 읽지 않도록 미리 준비.
 
 ---
 
-## STEP 1: Read Knowledge Base
+## STEP 0: Parse Arguments
 
-Read **ALL** claude_guide/ documents (25개). This is the only skill that reads the full knowledge base.
+Extract from orchestrator args:
+- `pipeline_plan`: 대상 스킬 목록 (예: `[question, research, spec, implementer, validation]`)
+- `goal`: 파이프라인 목표 (예: "결제 시스템 구현")
+- `project_root`: 프로젝트 루트 경로
 
-```
-Read: claude_guide/*.md (all 25 documents)
-```
-
-Extract and synthesize:
-- Claude Code best practices relevant to the project
-- Skill authoring conventions
-- Workflow patterns
-- Tool usage guidelines
-- Code quality standards
-
-**Do NOT dump raw content.** Synthesize into actionable knowledge organized by relevance to different skill types.
+IF args are missing or unclear:
+  → Read pipeline-state.md에서 Goal과 Pipeline Plan 추출
 
 ---
 
-## STEP 2: Read Project Context
+## STEP 1: Read Sources
 
-Gather project-specific context:
+### 1.1 claude_guide 읽기
 
-| Source | What to Extract |
-|--------|----------------|
-| `CLAUDE.md` | Project rules, architecture, constraints |
-| `package.json` | Tech stack, dependencies, versions |
-| Relevant source files | Current implementation shape (brief) |
-| `docs/specs/` | Active specifications |
-| `docs/reports/` | Prior research/synthesis reports |
+1. `claude_guide/INDEX.md` 확인
+   - 존재하면: INDEX 기반으로 스킬별 관련 문서 선별
+   - 없으면: `claude_guide/` 디렉토리 Glob → 파일명으로 주제 추론
 
-**Summarize** project context in 5-10 sentences. Do not include full file contents.
+2. **선별 읽기 원칙:**
+   - 25개 전부 읽지 않음 — 컨텍스트 예산 초과 방지
+   - 스킬당 최대 2-3개 관련 문서만 참조
+   - 공통 문서 (best practices, overview) + 스킬 특화 문서
 
----
+### 1.2 프로젝트 컨텍스트 읽기
 
-## STEP 3: Classify Complexity
+1. 프로젝트 루트 `CLAUDE.md` 읽기
+2. 핵심 정보 추출: tech stack, conventions, constraints, architecture
 
-Assess the overall task complexity using risk-driven classification:
+### 1.3 스킬별 기대 사항 확인
 
-| Level | Criteria |
-|-------|----------|
-| **TRIVIAL** | 1 file, <20 LOC, no deps/DB/arch changes |
-| **SIMPLE** | Single module, multiple functions |
-| **MEDIUM** | Crosses module boundaries |
-| **COMPLEX** | Multiple interfaces/contracts affected |
-
-Include complexity in every enriched prompt so downstream skills can adjust their behavior.
+pipeline_plan의 각 스킬 SKILL.md에서:
+- "Context Mode Detection" 섹션 확인 → 각 스킬이 enriched prompt에서 무엇을 기대하는지 파악
+- 없으면: 스킬의 STEP 0 (Parse Input) 참조
 
 ---
 
-## STEP 4: Generate Enriched Prompts
+## STEP 2: Generate Enriched Prompts
 
-For **each skill** in the pipeline plan, generate a tailored enriched prompt:
+For each skill in pipeline_plan:
 
-### Per-skill enriched prompt structure:
+1. claude_guide에서 해당 스킬에 관련된 best practices 추출
+2. 프로젝트 컨텍스트 + 스킬별 가이드라인 + 파이프라인 목표를 결합
+3. `.claude/enriched/{skill_name}.md`로 저장
+
+### Enriched Prompt 파일 형식
 
 ```markdown
----
-target_skill: [skill name]
-pipeline_id: [goal-slug-date]
-task_hash: [sha256(original_request + target_skill)]
-complexity: [TRIVIAL/SIMPLE/MEDIUM/COMPLEX]
-created: [YYYY-MM-DD]
-pipeline_plan: [full ordered list]
-current_position: [N of M]
----
+# Enriched Context for /[skill_name]
 
-## Original Request
-[User's request — enriched and clarified]
+## Pipeline Goal
+[goal from orchestrator — 1줄]
 
 ## Project Context
-[Summarized project info relevant to THIS skill's role]
+[CLAUDE.md 핵심 요약: tech stack, conventions, constraints]
 
-## Relevant Knowledge
-[claude_guide knowledge specifically useful for this skill]
-- [Best practice 1 relevant to this skill's task]
-- [Convention 2 relevant to this skill's task]
-- [Pattern 3 relevant to this skill's task]
+## Best Practices for This Skill
+[claude_guide에서 추출한 관련 가이드라인 — 스킬 역할에 맞게 선별]
 
-## Task for This Skill
-[What this specific skill should focus on, given the overall pipeline context]
-
-## Complexity & Constraints
-- Overall complexity: [level]
-- This skill's scope: [what it handles vs what other skills handle]
-- Constraints: [from CLAUDE.md and project rules]
-
-## Prior Context (if any)
-[References to previous pipeline artifacts — specs, reports, scan results]
+## Your Role in This Pipeline
+[이 스킬이 파이프라인에서 담당하는 역할 + 전후 스킬과의 관계]
+[예: "You are the 3rd step. /question already explored options. Your job is to deep-dive on the chosen approach."]
 ```
 
-### Knowledge distribution rules:
+### 파일 출력 위치
 
-| Skill Type | Knowledge Focus |
-|------------|----------------|
-| question, research | 기술 탐색 패턴, 비교 분석 방법, 트렌드 조사 |
-| spec | 스펙 작성 규칙, 수용기준 설계, 의사결정 구조 |
-| implementer | 코드 품질, 빌드 체크, git 워크플로우, 테스트 패턴 |
-| validation | 리뷰 기준, 보안 체크, 아키텍처 평가 |
-| problem | 디버깅 패턴, 정적 분석, 근본 원인 추적 |
-| scanner | 레퍼런스 탐색, AST 도구, 의존성 분석 |
-| migration | 빌드 체크 루프, leaf-first 순서, 체크포인트 |
-| result | 크로스 검증, 합의 도출, 신뢰도 평가 |
+`.claude/enriched/` 디렉토리에 저장:
+```
+.claude/enriched/question.md
+.claude/enriched/research.md
+.claude/enriched/spec.md
+.claude/enriched/implementer.md
+.claude/enriched/validation.md
+```
 
-**Not every skill needs all 25 docs' knowledge.** Distribute only what's relevant.
+디렉토리가 없으면 생성.
 
 ---
 
-## STEP 5: Save Enriched Prompts
+## STEP 3: Update State
 
-Save each enriched prompt to:
-```
-docs/prompts/cache/enriched-for-{skill_name}.md
-```
+pipeline-state.md 업데이트:
 
-Example for a pipeline `[question, research, spec, implementer]`:
-```
-docs/prompts/cache/enriched-for-question.md
-docs/prompts/cache/enriched-for-research.md
-docs/prompts/cache/enriched-for-spec.md
-docs/prompts/cache/enriched-for-implementer.md
-```
-
----
-
-## STEP 6: Update Pipeline State
-
-Update `.claude/pipeline-state.md`:
-
+### YAML frontmatter
 ```yaml
-enriched_prompts:
-  question: docs/prompts/cache/enriched-for-question.md
-  research: docs/prompts/cache/enriched-for-research.md
-  spec: docs/prompts/cache/enriched-for-spec.md
-  implementer: docs/prompts/cache/enriched-for-implementer.md
+bootstrap_completed: true
+enriched_prompt_paths:
+  question: .claude/enriched/question.md
+  research: .claude/enriched/research.md
+  # ... (생성된 파일만)
 ```
 
-Report to user:
-```
-Enriched prompts generated for [N] skills:
-- question: [1-line summary of focus]
-- research: [1-line summary of focus]
-- spec: [1-line summary of focus]
-- implementer: [1-line summary of focus]
+### Markdown body
+- **Completed:** "guide" 추가
+- **Recommended Next:** pipeline_plan의 첫 번째 스킬
+- **Preserve:** `pending_target_skill` — orchestrator가 이미 설정함. 수정하지 않음
 
-Complexity: [level]
-Orchestrator will proceed with the pipeline.
+---
+
+## STEP 4: Handoff
+
 ```
+"Enriched prompts 생성 완료 ([N]개 스킬: [파일 목록]). /orchestrator를 다시 호출하면 다음 단계로 진행됩니다."
+```
+
+생성된 파일 목록을 간략히 출력.
 
 ---
 
 ## Quality Checklist
 
 ### Must-pass
-- [ ] ALL 25 claude_guide docs read
-- [ ] Project context gathered (CLAUDE.md + deps)
-- [ ] Complexity classified
-- [ ] Enriched prompt generated for EACH skill in pipeline plan
-- [ ] Each enriched prompt has YAML frontmatter (target_skill, pipeline_id, task_hash)
-- [ ] Each enriched prompt has relevant (not all) claude_guide knowledge
-- [ ] Files saved to docs/prompts/cache/
-- [ ] Pipeline state updated with enriched_prompts map
+- [ ] pipeline_plan의 모든 스킬에 대해 enriched prompt 파일 생성됨
+- [ ] 각 파일에 Pipeline Goal, Project Context, Best Practices, Role 섹션 존재
+- [ ] claude_guide 전체가 아닌 선별 문서만 읽음 (스킬당 최대 3개)
+- [ ] pipeline-state.md에 bootstrap_completed와 경로 기록됨
+- [ ] Handoff 메시지에 다음 스킬 명시됨
 
 ### Should-pass
-- [ ] Knowledge distribution matches skill type table
-- [ ] Prior artifacts referenced (specs, reports) if they exist
-- [ ] Complexity rationale included in each enriched prompt
+- [ ] 스킬별 SKILL.md의 Context Mode Detection 요구사항 반영됨
+- [ ] 프로젝트 CLAUDE.md의 conventions이 각 enriched prompt에 포함됨
 
 ---
 
 ## Anti-Patterns
 
-- **Writing code**: guide generates prompts, not code. If you're about to use Edit or Bash → STOP.
-- **Dispatching agents**: guide does NOT use Agent tool. That's implementer's job.
-- **Selective reading**: Read ALL 25 docs. Don't skip based on title — relevance is determined after reading.
-- **Dumping raw docs**: Synthesize, don't copy-paste. Each enriched prompt should contain distilled knowledge.
-- **One-size-fits-all**: Each skill gets a DIFFERENT enriched prompt. Don't generate identical content for all.
-- **Ignoring pipeline position**: Each enriched prompt should note where the skill sits in the pipeline and what comes before/after.
-- **Forgetting degraded mode exists**: Other skills can run without enriched prompts. Guide is an enhancer, not a gatekeeper.
+- **claude_guide/ 25개 전부 읽기** — 컨텍스트 예산 초과. INDEX 기반 선별만.
+- **코드 작성, 디버깅, 구현** — /implementer의 역할. guide는 읽기 + 쓰기만.
+- **복잡도 분류, 서브에이전트 디스패치** — /implementer의 역할.
+- **enriched prompt 없이 handoff** — 목적 불달성. 최소 1개는 생성.
+- **스킬별 차이 없는 generic prompt** — 각 스킬의 역할과 관련 가이드라인이 달라야 함.
 
 ---
 
@@ -230,6 +168,5 @@ Orchestrator will proceed with the pipeline.
 
 If `.claude/pipeline-state.md` exists, update it before concluding:
 
-1. YAML frontmatter: set `delegated_to:` to empty, update `updated:` to today
-2. Add `enriched_prompts:` map to frontmatter
-3. Markdown body: add `guide` to **Completed**, update **Artifacts** with cache file paths, set **Recommended Next** to first skill in pipeline plan
+1. YAML frontmatter: set `delegated_to:` to empty, set `bootstrap_completed: true`, update `updated:` to today
+2. Markdown body: add `guide` to **Completed**, update **Artifacts** with enriched prompt paths, set **Recommended Next** based on pipeline_plan

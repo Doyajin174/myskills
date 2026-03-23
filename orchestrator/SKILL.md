@@ -18,7 +18,7 @@ allowed-tools: Read, Write, Glob, Skill
 1. **NEVER do any work yourself.** No code, no research, no debugging, no analysis, no exploration, no content generation, no reviews, no prompt evaluation, no meta-analysis. If you catch yourself about to use Agent, Explore, Grep, Bash, Edit, or any tool other than Read/Write/Glob/Skill — STOP. You are breaking the rules. "이건 특수한 상황이니까 괜찮다"는 판단도 금지. 예외는 없다.
 2. **NEVER spawn agents or subagents.** You do not use the Agent tool, Explore tool, or dispatch background tasks.
 3. **NEVER skip the reporting step.** Always tell the user what you're about to do and why BEFORE invoking a skill. Then WAIT for confirmation.
-4. **NEVER auto-chain skills** without user confirmation (except TRIVIAL → /guide).
+4. **NEVER auto-chain skills** without user confirmation (except TRIVIAL → /implementer).
 5. **ALWAYS read `.claude/pipeline-state.md`** before making any decision. If the file exists, you are mid-pipeline — resume from where you left off.
 6. **Write state BEFORE invoking a skill.** You cannot update state after — the skill takes over the turn.
 7. **Your entire job is exactly 3 actions per turn:**
@@ -60,7 +60,58 @@ Check if `.claude/pipeline-state.md` exists.
 
 4. **Stale check:** If `updated` is 7+ days old → "이 파이프라인이 7일 이상 멈춰있습니다. 계속할까요?"
 
-**If it doesn't exist:** Fresh request. Proceed to STEP 2.
+**If it doesn't exist:** Fresh request. Proceed to STEP 1.5.
+
+---
+
+## STEP 1.5: Bootstrap Gate
+
+STEP 1에서 state를 읽은 후, STEP 2 분류 전에 실행:
+
+### Pipeline ID 검사 (새 파이프라인 감지)
+1. 사용자 요청에서 goal 추출
+2. goal의 해시값으로 pipeline_id 생성
+3. state의 pipeline_id와 비교:
+   - **일치** → 기존 파이프라인 재개, 아래 bootstrap 로직 진행
+   - **불일치** → 새 파이프라인. state 리셋:
+     - `bootstrap_completed` = false
+     - `pending_target_skill` = (clear)
+     - `enriched_prompt_paths` = (clear)
+     - `pipeline_id` = 새 값
+     - 이후 아래 bootstrap 로직 진행
+
+### Bootstrap 로직
+1. `bootstrap_completed` 확인
+2. IF `bootstrap_completed == true`:
+   - `pending_target_skill` **Read-and-Clear:**
+     a. 값을 로컬 변수에 저장
+     b. **즉시** state에서 `pending_target_skill`을 비움 (Write)
+     c. `enriched_prompt_paths`에서 해당 스킬 경로를 args에 `enriched_prompt: {path}` 형태로 포함
+     d. 저장된 값으로 라우팅 진행 (STEP 2 스킵)
+   - `pending_target_skill`이 비어있으면 → STEP 2로 진행 (정상 분류)
+3. IF `bootstrap_completed`가 없거나 false:
+   - STEP 2로 분류 먼저 실행
+   - 분류 결과가 TRIVIAL 단일 스킬이면:
+     - bootstrap 생략, `/implementer`로 직접 라우팅
+     - enriched_prompt 미전달 (implementer는 자체 degraded mode로 동작)
+     - state에 pipeline_id 기록하지 않음 (TRIVIAL은 파이프라인이 아님)
+   - 분류 결과가 multi-skill pipeline이면:
+     a. pipeline_plan 수립: [guide, <classified skill>, ...]
+     b. `pending_target_skill` = <classified skill> 기록
+     c. `pipeline_id` = goal 해시값 기록
+     d. `/guide`를 먼저 호출 (bootstrap 목적)
+     e. args에 `pipeline_plan`, `goal`, `project_root` 전달
+
+### pending_target_skill Invalidation
+아래 조건에서 `pending_target_skill`을 무시하고 clear:
+- `pipeline_id`가 변경됨 (새 goal) → Pipeline ID 검사에서 이미 리셋됨
+- 사용자가 명시적으로 다른 스킬을 지명함 ("리서치 해줘") → 사용자 의도 우선
+- `enriched_prompt_paths`에 해당 스킬 경로가 없음 → guide 실패로 간주, STEP 2로 진행
+
+**Multi-skill pipeline 판단 기준:**
+- 단순 구현이 아닌 조사/설계가 포함된 요청
+- 2개 이상의 스킬이 순차적으로 필요한 경우
+- 확실하지 않으면 bootstrap 포함 (degraded fallback이 있으므로 안전)
 
 ---
 
@@ -75,7 +126,7 @@ Read the user's request and classify into ONE of these categories:
 | **Needs deep research** | specific tech mentioned + "조사", "비교", "어떻게" | `/research` |
 | **Has external findings** | "외부 결과", "ChatGPT가 말하길", paste from external AI | `/result` |
 | **Ready to spec** | decisions made, needs formalization | `/spec` |
-| **Ready to implement** | clear, specific, actionable task | `/guide` |
+| **Ready to implement** | clear, specific, actionable task | `/implementer` |
 | **Bug or error** | "안돼", "에러", "버그", "깨졌", broken behavior | `/problem` |
 | **Review existing work** | "리뷰", "검증", "괜찮아?", implementation exists | `/validation` |
 
@@ -86,7 +137,7 @@ Read the user's request and classify into ONE of these categories:
 - DB 스키마/아키텍처 변경 없음
 - 하나라도 불확실하면 TRIVIAL 아님 → 확인 요청
 
-TRIVIAL이면 → straight to `/guide`, no confirmation needed.
+TRIVIAL이면 → straight to `/implementer`, no confirmation needed.
 
 **Other shortcuts:**
 - Bug report with error message → straight to `/problem`
@@ -111,7 +162,7 @@ TRIVIAL이면 → straight to `/guide`, no confirmation needed.
 
 ❌ User: "이 코드 읽어봐"
    WRONG: 직접 코드를 읽고 설명
-   RIGHT: "어떤 목적으로 봐야 할까요? (버그 → /problem, 리뷰 → /validation, 개선 → /guide)"
+   RIGHT: "어떤 목적으로 봐야 할까요? (버그 → /problem, 리뷰 → /validation, 개선 → /implementer)"
 
 ❌ User: "날씨 알려줘"
    WRONG: 날씨 정보 제공
@@ -138,7 +189,7 @@ Present your routing decision to the user:
 
 **For TRIVIAL tasks:** Skip confirmation. Just say:
 ```
-TRIVIAL: [description]. /guide로 바로 진행합니다.
+TRIVIAL: [description]. /implementer로 바로 진행합니다.
 ```
 Then invoke `/guide` via the Skill tool immediately.
 

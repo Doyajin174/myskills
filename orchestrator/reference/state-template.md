@@ -15,8 +15,11 @@ delegated_to: [마지막으로 호출한 스킬 — 완료 시 orchestrator가 r
 visit_count:
   [skill_name]: [N]
 updated: [YYYY-MM-DD]
+pipeline_id: [goal 해시 — 파이프라인 스코프 식별자. 새 goal 감지 시 state 리셋 트리거]
 pipeline_plan: [스킬 실행 순서 — orchestrator가 계획 시 기록]
-enriched_prompts:
+bootstrap_completed: [true/false — /guide bootstrap 완료 여부. pipeline_id와 함께 스코프됨]
+pending_target_skill: [bootstrap 후 라우팅할 스킬 — Read-and-Clear 규칙 적용 (아래 상태표 참조)]
+enriched_prompt_paths:
   [skill_name]: [enriched prompt 파일 경로]
 ---
 ## Pipeline State
@@ -118,4 +121,20 @@ updated: 2026-03-23
 - **Worker skill writes (post-completion):** `Completed` (자기 이름 추가), `Artifacts` (생성 파일), `Recommended Next` (라우팅 테이블 기반)
 - **Worker skill clears:** `delegated_to` → 비움
 - **Key Decisions:** Worker skill이 발견한 핵심 결정사항 추가
+- **Guide (bootstrap) writes:** `bootstrap_completed`, `enriched_prompt_paths`
+- **Orchestrator manages:** `pipeline_id` (생성/비교/리셋), `pending_target_skill` (set/read-and-clear)
 - **Orchestrator fallback:** Worker가 state를 안 쓴 경우, STEP 1에서 Glob 기반으로 reconcile
+
+---
+
+## pending_target_skill 상태표
+
+| Event | Action | 주체 |
+|-------|--------|------|
+| Multi-skill 분류 완료 | **SET** `pending_target_skill` = 분류된 스킬 | Orchestrator STEP 1.5 |
+| /guide 호출 직전 | (유지 — guide가 수정하지 않음) | Orchestrator |
+| /guide 완료, orchestrator 재진입 | **READ** → 로컬 저장 → 즉시 **CLEAR** | Orchestrator STEP 1.5 |
+| 로컬 값으로 스킬 dispatch | **DISPATCH** (값은 이미 state에서 제거됨) | Orchestrator STEP 4 |
+| pipeline_id 변경 (새 goal) | **INVALIDATE** + **CLEAR** | Orchestrator STEP 1.5 |
+| 사용자 수동 스킬 지명 | **INVALIDATE** + **CLEAR** | Orchestrator STEP 2 |
+| enriched_prompt 경로 없음 | **INVALIDATE** + **CLEAR** (guide 실패) | Orchestrator STEP 1.5 |
