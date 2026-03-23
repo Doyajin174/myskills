@@ -142,6 +142,21 @@ For each batch in order (Tier 1 → Tier 2 → Tier 3):
 - If errors cascade (>20 errors from one change), you likely changed a core type too early. **Stop, revert, re-plan.**
 - If an error is in a file NOT in the current batch, that file has an undiscovered dependency. Add it to the batch or move to the next tier.
 
+### Migration abort rules (hard stop)
+
+**STOP the entire migration if ANY of these conditions is met:**
+- 50%+ of total batches have failed
+- 2 consecutive batches fail their retry loops
+- Skipped files exceed 30% of total target files
+
+**On abort:**
+1. Do NOT proceed to the next batch
+2. Generate a diagnostic report: which batches failed, error patterns, common causes
+3. Report to user: "자동 마이그레이션 한계를 넘었습니다. [N]개 배치 중 [M]개 실패."
+4. Route to `/problem` for architectural diagnosis
+
+**This is a HARD STOP, not a suggestion.** Continuing past this point creates a half-migrated codebase that is worse than the original.
+
 ### Context management
 
 After each batch:

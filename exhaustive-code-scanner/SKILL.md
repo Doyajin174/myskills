@@ -50,23 +50,48 @@ Module patterns: import paths (e.g., "lib/tiers", "@/lib/tiers")
 ```
 
 If the user provides vague input ("포인트 시스템 다 찾아"), ask ONE clarifying question to get specific symbol names.
+**STOP and do not proceed until you have explicit symbol names.** Do not rationalize "I have enough context." Scanning without specific patterns produces garbage results.
 
 ---
 
-## STEP 1: Pre-Scan — Dead Code Filter (knip)
+## STEP 0.5: Pre-Flight Dependency Check
 
-Run knip FIRST to identify already-dead code. Don't waste time scanning references to code nobody uses.
+Verify required tools before scanning:
+```bash
+npx @ast-grep/cli --version 2>/dev/null || echo "⚠️ ast-grep NOT available"
+npx tsc --version 2>/dev/null || echo "⚠️ tsc NOT available"
+npx knip --version 2>/dev/null || echo "⚠️ knip NOT available"
+```
+
+- All available → proceed normally
+- ast-grep missing → degrade to rg + tsc only (confidence ceiling: 85%)
+- tsc missing → ABORT ("tsc is required for verification. Install TypeScript first.")
+- knip missing → skip STEP 1, note in confidence
+
+**ripgrep fallback:** If Grep tool fails during scan, fall back to:
+```bash
+grep -rn "pattern" --include="*.ts" --include="*.tsx" --include="*.json" .
+```
+If both rg and grep fail → ABORT ("No text search tool available.")
+
+---
+
+## STEP 1: Pre-Scan — Dead Code Tagging (knip)
+
+Run knip FIRST to identify dead code candidates. **Tag only — do NOT exclude yet.**
 
 ```bash
 npx knip --reporter compact 2>&1
 ```
 
 From knip output, extract:
-- Unused exports → mark as "DEAD — skip from migration"
-- Unused files → mark as "DEAD FILE — candidate for deletion"
+- Unused exports → tag as `dead-code-candidate` (NOT "confirmed dead")
+- Unused files → tag as `dead-file-candidate`
 - Unused dependencies → note for cleanup
 
-**Output:** Dead code list. These are excluded from the reference map (they'll be deleted, not migrated).
+**Output:** Dead code candidate list. These are **tagged, not excluded.** Final exclusion happens after migration completes (knip can have false positives with dynamic imports, barrel files, and framework plugins).
+
+**Cross-validate:** For each knip-flagged unused export, run `Grep(symbol)` to confirm zero references. If grep finds references knip missed → remove the dead-code tag.
 
 **If knip fails (network/cache):** Skip this layer. Proceed with rg. Note "knip skipped" in confidence score.
 
@@ -155,23 +180,26 @@ Order: leaf → intermediate → core (this is the migration order).
 
 ## STEP 4: Confidence Score + Manual Checklist
 
-### Confidence Score (4-factor weighted)
+### Confidence Score (Grade + Ceiling)
 
-| Factor | Weight | Check |
-|--------|--------|-------|
-| Project coverage | 30% | Did tsc include all expected files? |
-| Structural coverage | 30% | Did ast-grep + rg both run across source/test/config? |
-| Semantic verification | 20% | Are rg results validated by ast-grep or tsc? |
-| Residue check | 20% | Is dead code identified (knip ran)? |
+Assign a grade based on which layers completed successfully:
 
-**Deductions:**
-- -10% if ast-grep skipped
-- -10% if knip skipped
-- -5% per dynamic import pattern found
-- -5% if DB/API string coupling detected
-- -15% if cross-repo consumers suspected
+| Grade | Condition | Ceiling |
+|-------|-----------|---------|
+| **High** | tsc + ast-grep + knip all passed | 95% |
+| **Medium** | ast-grep passed but tsc had issues OR knip skipped | 85% |
+| **Low** | ripgrep only (ast-grep and/or tsc unavailable) | 70% |
+
+**Ceiling reductions (apply on top of grade):**
+- Dynamic import patterns found → -5%
+- DB/API string coupling detected → -5%
+- Cross-repo consumers suspected → -15%
+- Tool degraded (ast-grep skipped) → ceiling capped at 85%
+- Tool degraded (knip skipped) → ceiling capped at 92%
 
 **Cap at 95%.** Never claim 100% — dynamic references are always possible.
+
+**Report as:** "Confidence: **High (92%)**" — grade first, then number. The grade is the signal; the number is supplementary.
 
 ### Manual Verification Checklist
 
@@ -227,12 +255,27 @@ Save to `docs/reports/{topic}-scan-report.md`:
 | # | File | Line | Symbol | Category | Layer Found | Confidence |
 |---|------|------|--------|----------|-------------|------------|
 
+## Replacement Mapping (for /code-migration)
+| Old Symbol | New Symbol | Mutation Policy |
+|------------|-----------|----------------|
+| [e.g., MembershipTier] | [e.g., Plan] | auto / manual / forbidden |
+
+**Mutation Policy:**
+- `auto` — safe for LLM to edit (import swaps, type renames)
+- `manual` — requires human review (business logic changes)
+- `forbidden` — do not touch (generated code, vendor, migrations)
+
+## Barrier Flags (cannot be auto-migrated)
+| File | Line | Pattern | Reason |
+|------|------|---------|--------|
+| [file] | [line] | dynamic import / string registry / reflection | [why] |
+
 ## Dependency Graph (leaf-first order)
 ### Tier 1 — Leaf files (migrate first)
 ### Tier 2 — Intermediate files
 ### Tier 3 — Core files (migrate last)
 
-## Dead Code (knip — exclude from migration)
+## Dead Code Candidates (knip — tagged, not excluded)
 | File | Export | Status |
 |------|--------|--------|
 
