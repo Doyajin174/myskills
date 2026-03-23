@@ -4,14 +4,14 @@
 
 | Skill | Skill Tool Name | Entry Condition | Exit Criteria | Allowed Next |
 |-------|----------------|----------------|---------------|-------------|
-| /brainstorming | `brainstorming` | 모호한 아이디어, 구체적 목표 없음. "~하면 좋겠다", "뭔가 만들고 싶다" | 구체적 목표 1개 이상 도출됨 | /question, /guide |
+| /brainstorming | `brainstorming` | 모호한 아이디어, 구체적 목표 없음. "~하면 좋겠다", "뭔가 만들고 싶다" | 구체적 목표 1개 이상 도출됨 | /question, /guide, /writing-plans |
 | /question | `question-prompt-generator` | 목표는 있으나 접근법/기술 미정. "어떻게 만들지?", "뭘 써야해?" | 기술 옵션 2개+ 식별 + 내부조사 완료 | /result, /research |
-| /research | `research-prompt-generator` | 특정 기술 1-2개 선택됨, 심층 조사 필요. "이 기술 자세히 알아봐" | 구현 세부사항 + 프롬프트 생성 완료 | /result |
+| /research | `research-prompt-generator` | 특정 기술 1-2개 선택됨, 심층 조사 필요. "이 기술 자세히 알아봐" | 구현 세부사항 + 프롬프트 생성 완료 | /result, /spec, /question, /problem |
 | /result | `result-synthesizer` | 내부 조사 결과 + 외부 AI 응답 존재. "종합해줘", "결과 정리" | 합성 리포트 생성, 접근법 결정됨 | /spec, /research (더 조사 필요 시), /guide (SIMPLE 시) |
-| /spec | `spec-generator` | 접근법 결정됨, 구현 스펙 확정 필요. "만들 거 정리", "스펙" | 스펙 문서 생성 (`docs/specs/`) | /guide |
-| /guide | `guide` | 구현 준비 완료 (스펙 또는 명확한 요청 존재) | 코드 구현 + 검증 완료 | /validation |
-| /validation | `validation-prompt-generator` | 구현 완료, 품질 검증 필요. "리뷰해줘", "괜찮아?" | 품질 평가 리포트 생성 | ship (완료), /problem (버그 발견), /guide (재작업) |
-| /problem | `problem-prompt-generator` | 버그, 에러, 예상과 다른 동작. "안돼", "에러", "버그" | 원인 분석 + 수정 완료 | /validation (재검증), /research (설계 결함) |
+| /spec | `spec-generator` | 접근법 결정됨, 구현 스펙 확정 필요. "만들 거 정리", "스펙" | 스펙 문서 생성 (`docs/specs/`) | /guide, /research (미결정 사항 多), /problem, /validation |
+| /guide | `guide` | 구현 준비 완료 (스펙 또는 명확한 요청 존재) | 코드 구현 + 검증 완료 | /validation, /problem |
+| /validation | `validation-prompt-generator` | 구현 완료, 품질 검증 필요. "리뷰해줘", "괜찮아?" | 품질 평가 리포트 생성 | /finishing-a-development-branch (ship), /problem (버그), /guide (재작업), /research (설계 결함) |
+| /problem | `problem-prompt-generator` | 버그, 에러, 예상과 다른 동작. "안돼", "에러", "버그" | 원인 분석 + 수정 완료 | /validation (재검증), /research (설계 결함), /guide (수정 구현) |
 
 ## Direct Route Shortcuts
 
