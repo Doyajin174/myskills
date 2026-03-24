@@ -43,16 +43,15 @@ IF args are missing or unclear:
 
 ## STEP 1: Read Sources
 
-### 1.1 claude_guide 읽기
+### 1.1 claude_guide 전체 읽기
 
-1. `claude_guide/INDEX.md` 확인
-   - 존재하면: INDEX 기반으로 스킬별 관련 문서 선별
-   - 없으면: `claude_guide/` 디렉토리 Glob → 파일명으로 주제 추론
+`claude_guide/` 디렉토리의 **모든 문서(25개)를 전부 읽는다.** Guide는 전체 지식 베이스를 1회 로딩하여 각 스킬에 맞게 배분하는 유일한 스킬이다.
 
-2. **선별 읽기 원칙:**
-   - 25개 전부 읽지 않음 — 컨텍스트 예산 초과 방지
-   - 스킬당 최대 2-3개 관련 문서만 참조
-   - 공통 문서 (best practices, overview) + 스킬 특화 문서
+```
+Read: claude_guide/*.md (전부)
+```
+
+읽은 내용을 스킬별로 관련성 분류하여 enriched prompt에 배분. Raw dump가 아닌 스킬 역할에 맞게 합성.
 
 ### 1.2 프로젝트 컨텍스트 읽기
 
@@ -144,7 +143,7 @@ enriched_prompt_paths:
 ### Must-pass
 - [ ] pipeline_plan의 모든 스킬에 대해 enriched prompt 파일 생성됨
 - [ ] 각 파일에 Pipeline Goal, Project Context, Best Practices, Role 섹션 존재
-- [ ] claude_guide 전체가 아닌 선별 문서만 읽음 (스킬당 최대 3개)
+- [ ] claude_guide 전체(25개) 읽기 완료
 - [ ] pipeline-state.md에 bootstrap_completed와 경로 기록됨
 - [ ] Handoff 메시지에 다음 스킬 명시됨
 
@@ -156,7 +155,7 @@ enriched_prompt_paths:
 
 ## Anti-Patterns
 
-- **claude_guide/ 25개 전부 읽기** — 컨텍스트 예산 초과. INDEX 기반 선별만.
+- **claude_guide/ 읽기 건너뛰기** — 반드시 25개 전부 읽어야 함. Guide의 핵심 역할.
 - **코드 작성, 디버깅, 구현** — /implementer의 역할. guide는 읽기 + 쓰기만.
 - **복잡도 분류, 서브에이전트 디스패치** — /implementer의 역할.
 - **enriched prompt 없이 handoff** — 목적 불달성. 최소 1개는 생성.
