@@ -17,6 +17,7 @@
 | /finishing | `finishing-a-development-branch` | 구현 완료 + 테스트 통과. "머지", "PR 만들어", "정리" | 브랜치 정리/머지/PR 완료 | (pipeline 종료) |
 | /scanner | `exhaustive-code-scanner` | 특정 시스템/심볼의 모든 레퍼런스 탐색 필요. "스캔", "다 찾아", "어디서 쓰이나", "임팩트" | scan-report.md 생성 (레퍼런스 맵 + 의존성 그래프 + 신뢰도) | /code-migration, /guide |
 | /code-migration | `code-migration` | scan-report 존재 + 시스템 A→B 교체 실행. "마이그레이션", "교체", "갈아끼우기" | 마이그레이션 완료 + migration-report.md | /validation, /problem |
+| /db-safety-setup | `db-safety-setup` | DB migration 안전 체계 구축 필요. "DB 세팅", "마이그레이션 세팅", "DB 안전", "prisma migrate 전환" | shadow DB + CI 체크 + 배포 파이프라인 구축 완료 | /validation |
 
 ## Direct Route Shortcuts
 

@@ -229,6 +229,7 @@ After user confirms, do exactly TWO things:
 | /scanner | `exhaustive-code-scanner` |
 | /code-migration | `code-migration` |
 | /implementer | `implementer` |
+| /db-safety-setup | `db-safety-setup` |
 
 ---
 
