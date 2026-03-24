@@ -129,6 +129,9 @@ Read the user's request and classify into ONE of these categories:
 | **Ready to implement** | clear, specific, actionable task | `/implementer` |
 | **Bug or error** | "안돼", "에러", "버그", "깨졌", broken behavior | `/problem` |
 | **Review existing work** | "리뷰", "검증", "괜찮아?", implementation exists | `/validation` |
+| **UI/Design system** | "디자인", "UI 전체", "리디자인", "컴포넌트 시스템", 대규모 UI 작업 | `/design-system` |
+| **Code scan/audit** | "스캔", "레퍼런스 찾아", "임팩트 분석", "어디서 쓰이나" | `/scanner` |
+| **System replacement** | "마이그레이션", "교체", "갈아끼우기", "시스템 교체" | `/code-migration` |
 
 **TRIVIAL shortcut (ALL conditions must be met):**
 - 기존 파일 1개만 수정
