@@ -84,6 +84,38 @@ Degraded mode: claude_guide/INDEX.md에서 1-2개 선별 + CLAUDE.md 읽기.
 
 ---
 
+## STEP 0.6: Design Token Guardrails (UI 작업 시)
+
+수정 대상에 CSS/스타일이 포함될 때 적용:
+
+### 토큰 전용 규칙
+아래 속성에 raw value 사용 금지. 반드시 CSS custom property(`var(--*)`)만 사용:
+- `color`, `background-color`, `border-color`
+- `margin`, `padding`, `gap`
+- `font-family`, `font-size`
+- `border-radius`
+
+**허용 예외:** `0`, `1px` (hairline border), `100%`, `transparent`, `currentColor`, `inherit`
+
+### 에스컬레이션 트리거
+기존 토큰으로 표현할 수 없는 값이 필요할 때:
+→ 코드에 raw value를 넣지 말고, 사용자에게 보고:
+"이 변경에 새 토큰이 필요합니다. `/design-system`으로 에스컬레이션하시겠습니까?"
+
+### 로컬 스코프 원칙
+- 일회성 CSS는 해당 페이지/래퍼에만 스코프
+- 글로벌 셀렉터 추가 금지
+- 기존 컴포넌트 클래스에 스타일 덧붙이기 금지
+
+### 프로젝트 토큰 참조
+UI 작업 시 프로젝트의 토큰 정의 파일을 먼저 읽기:
+- `collect_styles.css`의 `:root` 섹션
+- 또는 `CLAUDE.md`에 명시된 토큰 파일
+
+사용 가능한 토큰을 파악한 후 작업 시작.
+
+---
+
 ## STEP 1: 복잡도 분류 (Risk-Driven Classification)
 
 Classify by **risk → ambiguity → verification → coupling → file count** (in that order).
@@ -426,6 +458,8 @@ Append to `.claude/skills/implementer/implementer_memory.md`:
 - **No same-boundary parallel** — check dependency graph before parallelizing
 - **No ignoring project conventions** — CLAUDE.md 규칙을 따르기
 - **No implementing without reading** — 수정 대상 파일과 관련 spec을 먼저 읽기
+- **No raw CSS values** — color, spacing, radius, font에 하드코딩 금지. `var(--*)` 토큰만 사용
+- **No design-system bypassing** — 새 토큰이 필요하면 에스컬레이션, 임의 생성 금지
 - **No automation-only signoff** — Playwright/Jest PASS는 코드 정합성만 보장. 세션/DB/캐시 같은 환경 요인은 별도 확인 필수. clean-room 테스트가 dirty-state 버그를 숨김
 - **No stale-session assumptions** — DB reset/seed/migration 후 기존 브라우저 세션의 auth token 유효성을 반드시 재확인
 

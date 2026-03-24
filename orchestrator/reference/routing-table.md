@@ -78,6 +78,26 @@ These bypass the normal pipeline when the situation is clear:
 - Error messages or stack traces present
 - Something was working and now isn't
 
+### /design-system vs /implementer (UI 작업 분류)
+
+**판단 기준:** "시스템의 어휘를 바꾸는가 vs 기존 어휘로 문장을 쓰는가"
+
+/design-system으로 가는 경우:
+- 토큰 값 추가/변경/삭제 (예: 새 색상 `--warning-bg` 추가)
+- 컴포넌트 구조/API/variant 변경 (예: 버튼에 compact variant 추가)
+- 새 재사용 패턴 생성 (예: 모달-to-인라인 전환 패턴을 공통화)
+- 2개+ 화면에 영향 또는 재사용 예정
+- 토큰 정의 파일(:root, variables.css) 직접 수정
+
+/implementer로 가는 경우 (토큰 가드레일 적용):
+- 기존 컴포넌트 재배치/재조합
+- 기존 토큰으로 색상/스페이싱 변경 (예: --bg-1 → --bg-2)
+- 레이아웃 전환 (팝업→인라인, 그리드→리스트)
+- 1개 화면 한정 일회성 수정
+- 버튼 위치 이동, 정렬 변경 등 로컬 조정
+
+---
+
 ## Out of Scope (라우팅 금지)
 
 이 요청들은 어떤 스킬에도 라우팅하지 않는다. Rule 8, 9에 따라 처리:
