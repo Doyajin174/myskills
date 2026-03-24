@@ -93,6 +93,16 @@ SHADOW_DATABASE_URL="postgresql://postgres:shadow@localhost:5433/shadow"
 
 **`.env.local`은 절대 git에 커밋하지 않는다.** `.gitignore`에 있는지 확인.
 
+### 1d. 사용자에게 Docker 안내
+
+Shadow DB가 Docker 컨테이너이므로, 수동 작업 안내에 포함:
+```
+Shadow DB 시작 방법:
+1. Docker 실행 (Docker Desktop 또는 `colima start`)
+2. `docker compose up -d shadow-db`
+3. 확인: `docker ps | grep shadow-db`
+```
+
 ---
 
 ## STEP 2: CI/CD 파이프라인
