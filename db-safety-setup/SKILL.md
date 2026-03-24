@@ -108,7 +108,8 @@ SHADOW_DATABASE_URL="postgresql://postgres:shadow@localhost:5433/shadow"
 
 `.github/workflows/deploy-staging.yml` 생성:
 - staging 브랜치 push 시 트리거
-- 순서: pg_dump backup → prisma migrate deploy → prisma generate
+- 순서: pg_dump 버전 자동 감지/설치 → pg_dump backup → prisma migrate deploy → prisma generate
+- pg_dump와 서버 버전 불일치 시 해당 버전 postgresql-client 자동 설치
 - migration 실패 시 배포 중단
 
 **브랜치명:** 프로젝트의 기본 배포 브랜치를 감지 (staging / main / deploy 등). 확실하지 않으면 사용자에게 질문.

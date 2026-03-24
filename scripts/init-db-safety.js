@@ -195,15 +195,33 @@ jobs:
 
       - run: npm ci
 
-      # 1. Backup staging DB before migration
+      # 1. Check pg_dump vs server version compatibility
+      - name: Check PostgreSQL version compatibility
+        run: |
+          SERVER_VER=\$(psql "\$DATABASE_URL" -t -c "SHOW server_version;" | tr -d ' ' | cut -d. -f1)
+          CLIENT_VER=\$(pg_dump --version | grep -oP '\\d+' | head -1)
+          echo "Server: PostgreSQL \$SERVER_VER"
+          echo "Client: pg_dump \$CLIENT_VER"
+          if [ "\$CLIENT_VER" -lt "\$SERVER_VER" ]; then
+            echo "Installing postgresql-client-\$SERVER_VER"
+            sudo apt-get install -y curl ca-certificates
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt \$(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client-\$SERVER_VER
+          fi
+        env:
+          DATABASE_URL: \${{ secrets.STAGING_DATABASE_URL }}
+
+      # 2. Backup staging DB before migration
       - name: Backup DB
         run: |
           pg_dump "\$DATABASE_URL" --format=custom -f backup_\$(date +%Y%m%d_%H%M%S).dump
         env:
           DATABASE_URL: \${{ secrets.STAGING_DATABASE_URL }}
-        continue-on-error: true
 
-      # 2. Apply Prisma migrations
+      # 3. Apply Prisma migrations
       - name: Run Prisma migrations
         run: npx prisma migrate deploy
         env:
