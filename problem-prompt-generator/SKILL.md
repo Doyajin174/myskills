@@ -51,6 +51,8 @@ Extract the mismatch details. For each, ask:
 | Error messages, stack traces (verbatim) | Evidence, not paraphrase |
 | Application logs, system logs | Runtime context — check log files if available |
 | Environment: OS, language version, key dependency versions | Environment-specific bugs |
+| Test env vs report env: how was bug verified? (Playwright, curl, real browser, staging, prod) | Environment parity — automation ≠ real world |
+| Runtime state: session/token validity, DB sync, cache, HMR state | Stale state bugs — DB reset 후 세션 불일치 등 |
 | What changed recently? (git log, dependency updates, config) | Regression candidate |
 | What has already been tried? | Avoid repeating failed fixes |
 | Relevant source files (read them) | Context for diagnosis |
@@ -60,6 +62,21 @@ Extract the mismatch details. For each, ask:
 - User reports: "This doesn't work" + description
 - /validation report: issues detected automatically
 - Monitoring alerts: metrics show anomaly
+
+### STEP 0.1: Environment Parity Snapshot (브라우저/앱/런타임 버그 시 필수)
+
+가설 수립 전에 보고 환경과 조사 환경의 상태를 비교:
+
+| 비교 항목 | 보고 환경 | 조사 환경 |
+|----------|----------|----------|
+| 브라우저/프로필 | | |
+| 로그인 상태 (세션/토큰) | | |
+| DB 상태 (reset/seed/migration 여부) | | |
+| 캐시 (브라우저, .next, webpack) | | |
+| 환경변수 (.env.local vs .env.production) | | |
+| 개발서버 상태 (HMR, Fast Refresh) | | |
+
+**차이가 있으면 `ENVIRONMENT-SUSPECT`로 태그하고, 코드 수정 전에 상태 불일치부터 해결.**
 
 ---
 
@@ -77,6 +94,19 @@ Classify the issue type. This guides investigation strategy:
 | **Configuration** | wrong config, env var, path mismatch | Config file diff, environment comparison, path resolution |
 | **Race condition** | intermittent, timing-dependent | Concurrency analysis, lock ordering, async flow tracing |
 | **Environment** | works here, fails there | OS/version diff, dependency comparison, platform-specific behavior |
+
+### ENVIRONMENT-SUSPECT 자동 감지 규칙
+
+아래 신호 중 **하나라도** 해당되면 자동으로 `ENVIRONMENT-SUSPECT`로 태그:
+- 자동화 테스트(Playwright/Jest/curl)는 통과하지만 실제 브라우저에서 실패
+- 새 로그인으로는 되지만 기존 세션으로는 실패
+- DB reset/seed/migration 직후 발생한 문제
+- 브라우저/프로필/시크릿 모드에 따라 재현이 달라짐
+- 캐시/스토리지 클리어 시 결과가 바뀜
+- 로컬에서는 되지만 preview/staging/production에서 실패
+- 서버 재시작 후 됨/안 됨이 달라짐
+
+**`ENVIRONMENT-SUSPECT` 태그 시:** 코드 가설보다 런타임 상태 가설을 먼저 검증. STEP 0.1 패리티 스냅샷 필수.
 
 ---
 
@@ -174,16 +204,24 @@ Agent 1 — TRACE (evidence gathering, follows /ai-only-debugging priority stack
            2. Check git history — git blame/log for when this broke
            3. Trace code — follow value flow backward from symptom to source
            4. Find related patterns — similar code elsewhere that works
-           5. Check configs — environment variables, config files, path resolution
-           6. Check logs — application logs, error logs if available
-           If static analysis is insufficient, note what runtime data would help.
-           Return: call chain, type analysis, recent changes, config state, related patterns."
+           5. Check environment parity — reported runtime vs investigation runtime
+           6. Check session/auth artifacts — cookies, localStorage, token age, user identity match
+           7. Check backend sync — does session's user/tenant still exist in DB after reset/seed/migration?
+           8. Check configs — environment variables, config files, base URLs, path resolution
+           9. Check logs — application logs, network errors, auth failures
+           If automation and manual behavior differ, prioritize runtime-state mismatch before code-change hypotheses.
+           Return: call chain, type analysis, recent changes, config state, environment parity, related patterns."
 
 Agent 2 — ROOT CAUSE (hypothesis testing):
   subagent_type: "general-purpose"
   run_in_background: true
   prompt: "Given this error: [error description + evidence]
            Form 2-3 competing hypotheses for the root cause.
+           **Must include at least 1 state-divergence hypothesis:**
+           - Stale session/token referencing deleted DB records
+           - Orphaned auth state after DB reset/seed/migration
+           - Cached assets from previous build (browser, .next, service worker)
+           - HMR partial reload leaving inconsistent state
            For each hypothesis:
            - What evidence supports it?
            - What evidence contradicts it?
@@ -276,7 +314,17 @@ IF root cause is unclear even after investigation:
   → Ask user. "Investigation inconclusive. Top hypotheses: [list]. Which to pursue?"
 ```
 
-After fix is applied (by any path), proceed to STEP 6 (Post-Fix Routing).
+After fix is applied (by any path), proceed to STEP 5.1 then STEP 6.
+
+### STEP 5.1: Fix Verification in Reported Environment (MANDATORY)
+
+수정 후 검증은 반드시 **버그가 보고된 환경**에서 수행:
+- 브라우저 버그 → 실제 브라우저에서 확인 (Playwright만으로는 불충분)
+- 특정 계정/세션 버그 → 해당 세션으로 확인 (새 로그인이 아닌 기존 세션)
+- DB 리셋 후 발생한 버그 → 기존 세션이 유효한지 확인
+- `ENVIRONMENT-SUSPECT` 태그 → 반드시 보고 환경 + 새 환경 모두에서 확인
+
+**규칙:** 자동화 테스트(Playwright/Jest) PASS는 코드 정합성만 보장. 세션/DB/캐시 같은 환경 요인은 별도 확인 필수.
 
 ---
 

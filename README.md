@@ -35,7 +35,7 @@ implementer (코드 실행)  |  scanner (레퍼런스 탐색)  |  code-migration
 validation → finishing
 ```
 
-## Pipeline Skills (17)
+## Pipeline Skills (16)
 
 ### Core Pipeline
 

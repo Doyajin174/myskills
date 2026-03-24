@@ -71,6 +71,13 @@ Degraded mode: claude_guide/INDEX.md에서 1-2개 선별 + CLAUDE.md 읽기.
 - 이후 구현에서 regression 비교용
 - 기존 테스트가 이미 깨져있으면 기록하고 진행 (신규 regression만 책임)
 
+### 0.4B Runtime Parity Baseline (환경 의존 변경 시)
+변경이 auth, session, DB reset/seed/migration, 캐시, HMR, SSR/CSR에 해당하면:
+- 보고 환경 vs 구현 환경 기록
+- 현재 세션 상태 기록 (로그인 유저, 토큰 유효성)
+- DB 상태 기록 (reset/seed/migration 이력, 세션 user ID가 DB에 존재하는지)
+- IF DB reset 수행됨 → 기존 브라우저 세션이 무효화되었음을 경고로 기록
+
 ### 0.5 Execution Memory 확인
 `.claude/skills/implementer/implementer_memory.md` 읽기.
 유사 작업의 과거 실패 패턴이 있으면 미리 참고.
@@ -296,6 +303,22 @@ When in doubt, run sequentially.
 - 기존 pass → fail 전환 = **regression, 수정 필요**
 - 기존 fail → fail 유지 = 허용 (이번 작업 책임 아님)
 
+### Runtime Verification Gate (환경 의존 변경 시 필수)
+
+코드 검증(tsc, test) 통과 후, 변경이 아래 영역에 해당하면 환경 검증 추가 수행:
+
+| 변경 유형 | 환경 검증 방법 |
+|----------|--------------|
+| UI/페이지/네비게이션 | 실제 브라우저에서 확인 (Playwright ≠ 실제 브라우저) |
+| 인증/세션/미들웨어 | 기존 세션 + 새 세션 모두 확인 |
+| DB 스키마/reset/migration | 기존 세션이 유효한지 확인 (JWT user ID ↔ DB) |
+| API 엔드포인트 | 실제 클라이언트에서 호출 확인 |
+| 캐시/HMR 관련 | 하드 리프레시 + 서버 재시작 후 확인 |
+
+**The Automation Paradox:** Playwright/Jest PASS는 코드 정합성만 보장. clean-room 테스트 환경은 stale state 버그를 숨긴다. 버그 수정의 경우, **버그가 보고된 재현 경로**로 반드시 최종 확인.
+
+IF 자동화 테스트 PASS but 실제 브라우저 FAIL → **STOP**, `/problem`으로 라우팅.
+
 ### 실패 시 복구
 1. `git restore --staged --worktree .` (tracked 파일 복원)
 2. `git clean -fd` (untracked 파일 제거)
@@ -385,6 +408,11 @@ Append to `.claude/skills/implementer/implementer_memory.md`:
 - [ ] Rollback plan defined for MEDIUM+
 - [ ] Baseline comparison 결과 보고됨
 
+### Conditional must-pass (해당 시 필수)
+- [ ] 버그 수정 시: 보고된 재현 경로로 최종 확인 완료 (자동 테스트만으로 선언 금지)
+- [ ] 환경 의존 변경 시: 실제 런타임 환경에서 확인 완료
+- [ ] DB reset/seed/migration 발생 시: 세션 identity가 현재 DB와 일치하는지 확인
+
 ---
 
 ## Anti-Patterns
@@ -398,6 +426,8 @@ Append to `.claude/skills/implementer/implementer_memory.md`:
 - **No same-boundary parallel** — check dependency graph before parallelizing
 - **No ignoring project conventions** — CLAUDE.md 규칙을 따르기
 - **No implementing without reading** — 수정 대상 파일과 관련 spec을 먼저 읽기
+- **No automation-only signoff** — Playwright/Jest PASS는 코드 정합성만 보장. 세션/DB/캐시 같은 환경 요인은 별도 확인 필수. clean-room 테스트가 dirty-state 버그를 숨김
+- **No stale-session assumptions** — DB reset/seed/migration 후 기존 브라우저 세션의 auth token 유효성을 반드시 재확인
 
 ---
 
