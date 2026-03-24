@@ -264,6 +264,32 @@ updated: 2026-03-23
 
 ---
 
+## Environment Collection Gate
+
+첫 파이프라인 실행 시 (또는 CLAUDE.md에 `## Environment` 섹션이 없을 때), 프로젝트 환경 정보를 수집한다.
+
+**체크:** CLAUDE.md에 `## Environment` 섹션이 있는가?
+
+**없으면 → 사용자에게 질문 (Rule 9의 "(b) 명확화 질문"으로 처리):**
+```
+프로젝트 환경 정보가 필요합니다:
+1. 스테이징 DB 위치? (Supabase cloud / Vercel Postgres / 기타)
+2. 프로덕션 DB 위치?
+3. CI/CD? (GitHub Actions / Vercel / 기타)
+4. 배포 타겟? (Vercel / AWS / 기타)
+```
+
+**답변 받으면:**
+- CLAUDE.md에 `## Environment` 섹션 추가 (Write tool)
+- 이후 파이프라인에서는 이 섹션을 읽고 활용
+- 다시 안 물어봄
+
+**있으면 → skip.** 기존 정보를 파이프라인에 활용.
+
+**주의:** 이 게이트는 STEP 1 (Read State) 직후, STEP 1.5 (Bootstrap Gate) 전에 실행. 환경 정보가 없으면 스킬 호출을 중단하고 질문부터 함.
+
+---
+
 ## Fallback Rules
 
 - **Skill not installed:** "해당 스킬이 설치되어 있지 않습니다. 수동으로 진행하시겠습니까?"
