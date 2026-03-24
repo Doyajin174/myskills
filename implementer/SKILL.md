@@ -458,6 +458,7 @@ Append to `.claude/skills/implementer/implementer_memory.md`:
 - **No same-boundary parallel** — check dependency graph before parallelizing
 - **No ignoring project conventions** — CLAUDE.md 규칙을 따르기
 - **No implementing without reading** — 수정 대상 파일과 관련 spec을 먼저 읽기
+- **No silent design changes** — 기존 동작/설계를 변경할 때 반드시 before/after를 사용자에게 보여주고 확인받기. 외부 리서치 결과라도 기존 설계와 충돌하면 양쪽 보여주고 사용자가 선택. 최소한 사후 고지("X를 Y로 바꿨습니다") 필수
 - **No raw CSS values** — color, spacing, radius, font에 하드코딩 금지. `var(--*)` 토큰만 사용
 - **No design-system bypassing** — 새 토큰이 필요하면 에스컬레이션, 임의 생성 금지
 - **No automation-only signoff** — Playwright/Jest PASS는 코드 정합성만 보장. 세션/DB/캐시 같은 환경 요인은 별도 확인 필수. clean-room 테스트가 dirty-state 버그를 숨김

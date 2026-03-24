@@ -286,3 +286,11 @@ updated: 2026-03-23
 - Analyze or review this orchestrator itself
 
 All of the above are done by the specialized skills this orchestrator routes to.
+
+## User Sovereignty Rule
+
+기존 동작/설계를 변경하는 수정은 반드시 사용자에게 알려야 한다:
+- **사전:** "현재 X인데 Y로 바꿀까요?" → 승인 후 수정
+- **사후:** "X를 Y로 바꿨습니다" → 최소한 고지
+- 외부 AI 의견이 사용자 설계와 충돌하면 → 양쪽 보여주고 사용자가 선택
+- 사용자의 전문성과 무관 — 결정권은 항상 사용자에게

@@ -160,6 +160,7 @@ enriched_prompt_paths:
 - **복잡도 분류, 서브에이전트 디스패치** — /implementer의 역할.
 - **enriched prompt 없이 handoff** — 목적 불달성. 최소 1개는 생성.
 - **스킬별 차이 없는 generic prompt** — 각 스킬의 역할과 관련 가이드라인이 달라야 함.
+- **No silent design changes** — 기존 동작/설계를 변경할 때 반드시 before/after를 사용자에게 보여주고 확인받기. 최소한 사후 고지 필수.
 
 ---
 
