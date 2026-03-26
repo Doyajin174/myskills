@@ -25,7 +25,7 @@ These bypass the normal pipeline when the situation is clear:
 
 | Situation | Direct Route | Reason |
 |-----------|-------------|--------|
-| TRIVIAL 구현 (1 file, <20 LOC, no deps/DB/arch) | → /guide | 리서치/스펙 불필요 |
+| TRIVIAL 구현 (1 file, <20 LOC, no deps/DB/arch) | → /implementer | Bootstrap 불필요, 직접 실행 |
 | 명확한 버그 + 에러 메시지 | → /problem | 탐색 불필요 |
 | 사용자가 스킬 직접 지명 | → 해당 스킬 | 사용자 의도 존중 |
 | "다음" / "계속" | → state file의 Recommended Next | 파이프라인 재개 |

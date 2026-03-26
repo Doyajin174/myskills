@@ -131,10 +131,72 @@ updated: 2026-03-23
 
 | Event | Action | 주체 |
 |-------|--------|------|
-| Multi-skill 분류 완료 | **SET** `pending_target_skill` = 분류된 스킬 | Orchestrator STEP 1.5 |
+| NON-TRIVIAL 분류 + bootstrap_completed=false | **SET** `pending_target_skill` = classified_skill | Orchestrator STEP 2.5 (Row 3) |
 | /guide 호출 직전 | (유지 — guide가 수정하지 않음) | Orchestrator |
-| /guide 완료, orchestrator 재진입 | **READ** → 로컬 저장 → 즉시 **CLEAR** | Orchestrator STEP 1.5 |
-| 로컬 값으로 스킬 dispatch | **DISPATCH** (값은 이미 state에서 제거됨) | Orchestrator STEP 4 |
-| pipeline_id 변경 (새 goal) | **INVALIDATE** + **CLEAR** | Orchestrator STEP 1.5 |
-| 사용자 수동 스킬 지명 | **INVALIDATE** + **CLEAR** | Orchestrator STEP 2 |
-| enriched_prompt 경로 없음 | **INVALIDATE** + **CLEAR** (guide 실패) | Orchestrator STEP 1.5 |
+| /guide 완료, orchestrator 재진입 | `invoke_now` = pending_target_skill → 즉시 **CLEAR** | Orchestrator STEP 2.5 (Row 1) |
+| 스킬 dispatch | **DISPATCH** invoke_now (값은 이미 state에서 제거됨) | Orchestrator STEP 4 |
+| pipeline_id 변경 (새 goal) | **INVALIDATE** + **CLEAR** | Orchestrator STEP 1 |
+| 사용자 수동 스킬 지명 | **INVALIDATE** + **CLEAR** | Orchestrator STEP 2.5 |
+| enriched_prompt 경로 없음 | **INVALIDATE** + **CLEAR** (guide 실패) | Orchestrator STEP 2.5 |
+
+---
+
+## Example — Bootstrap Turn 1 (NON-TRIVIAL, /guide 호출)
+
+이것은 bootstrap이 정상 작동하는 예시입니다. `invoke_now`가 classified_skill이 아닌 `/guide`입니다.
+
+```markdown
+---
+stage: guide
+delegated_to: guide
+classified_skill: validation
+visit_count:
+  guide: 1
+updated: 2026-03-26
+pipeline_id: pr-review-abc123
+pipeline_plan: [guide, validation]
+bootstrap_completed: false
+pending_target_skill: validation
+enriched_prompt_paths:
+---
+## Pipeline State
+- **Goal:** PR 리뷰해줘 내부감사만으로 충분해
+- **Completed:** (none)
+- **Key Decisions:** (none)
+- **Artifacts:** (none)
+- **Recommended Next:** /validation (after bootstrap)
+```
+
+**핵심:** `classified_skill: validation`이지만 `delegated_to: guide`입니다.
+이것이 정상입니다 — 분류와 실행은 다른 변수입니다.
+
+## Example — Bootstrap Turn 2 (pending_target_skill 소비)
+
+/guide가 완료된 후, orchestrator가 재진입하여 pending_target_skill을 소비합니다.
+
+```markdown
+---
+stage: validation
+delegated_to: validation
+classified_skill: validation
+visit_count:
+  guide: 1
+  validation: 1
+updated: 2026-03-26
+pipeline_id: pr-review-abc123
+pipeline_plan: [guide, validation]
+bootstrap_completed: true
+pending_target_skill:
+enriched_prompt_paths:
+  validation: .claude/enriched/validation.md
+---
+## Pipeline State
+- **Goal:** PR 리뷰해줘 내부감사만으로 충분해
+- **Completed:** guide
+- **Key Decisions:** (none)
+- **Artifacts:** .claude/enriched/validation.md
+- **Recommended Next:** /validation
+```
+
+**핵심:** `bootstrap_completed: true`, `pending_target_skill` 비움 (소비됨),
+`enriched_prompt_paths`에 validation 경로가 있음.
