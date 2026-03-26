@@ -107,6 +107,7 @@ Classify the issue type. This guides investigation strategy:
 - 서버 재시작 후 됨/안 됨이 달라짐
 
 **`ENVIRONMENT-SUSPECT` 태그 시:** 코드 가설보다 런타임 상태 가설을 먼저 검증. STEP 0.1 패리티 스냅샷 필수.
+**→ STEP 4.5 (Hypothesis Verification) 필수.** Fast-track bypass 불가 — 반드시 런타임 데이터로 가설 검증 후 수정 진행.
 
 ---
 
@@ -226,7 +227,11 @@ Agent 2 — ROOT CAUSE (hypothesis testing):
            - What evidence supports it?
            - What evidence contradicts it?
            - How would you test/prove it?
-           Return: ranked hypotheses with evidence assessment."
+           - **Verification command:** Provide the exact command, query, or manual step
+             to confirm/disprove this hypothesis (e.g., SQL query, curl command,
+             browser DevTools check, log grep). Be specific — not "check the DB"
+             but "SELECT * FROM users WHERE id = {value}".
+           Return: ranked hypotheses with evidence assessment + verification commands."
 
 Agent 3 — REGRESSION (impact analysis) [optional — for fixes touching shared code]:
   subagent_type: "Explore"
@@ -299,9 +304,91 @@ Paste external AI responses, then use /result to synthesize.
 
 ---
 
+## STEP 4.5: Hypothesis Verification Gate
+
+**Purpose:** 가설을 런타임 데이터로 검증한 후에만 코드 수정을 진행한다. 가설 수립(STEP 4) → 가설 검증(STEP 4.5) → 코드 수정(STEP 5).
+
+### Fast-track bypass
+
+아래 조건을 **모두** 만족하면 이 단계를 건너뛰고 STEP 5로 직행:
+- 가설 confidence가 HIGH
+- 모든 evidence가 정적 분석 기반 (코드, 타입, git history)
+- `ENVIRONMENT-SUSPECT` 태그가 **없음**
+
+**`ENVIRONMENT-SUSPECT` 태그 시:** bypass 불가. 반드시 런타임 검증 수행.
+
+### Verification Protocol
+
+상위 가설(STEP 4 보고서에서 #1 ranked)에 대해:
+
+**1. 검증 명령어 생성**
+
+Agent 2의 "Verification command" 출력을 기반으로 구체적 검증 계획을 작성:
+
+```
+## Hypothesis Verification Plan
+
+### Hypothesis: [top-ranked hypothesis]
+### Verification commands:
+
+| # | 명령어/확인 방법 | 가설이 맞으면 예상 결과 | 가설이 틀리면 예상 결과 |
+|---|-----------------|----------------------|----------------------|
+| 1 | [구체적 명령어] | [expected if true] | [expected if false] |
+| 2 | [구체적 명령어] | [expected if true] | [expected if false] |
+
+### AI가 직접 확인 가능:
+- [ ] 파일 시스템 상태 (파일 존재 여부, 설정 파일 내용)
+- [ ] 환경변수 값
+- [ ] git log / git blame
+
+### 사용자 확인 필요:
+- [ ] DB 쿼리 실행: `[exact query]`
+- [ ] 브라우저 DevTools: [구체적 확인 항목]
+- [ ] 서버 로그: `[grep command]`
+- [ ] curl/API 테스트: `[exact command]`
+```
+
+**2. AI 자동 확인 실행**
+
+직접 확인 가능한 항목은 즉시 실행하고 결과를 기록.
+
+**3. 사용자 확인 요청**
+
+수동 확인이 필요한 항목은 사용자에게 구체적 명령어와 함께 요청:
+```
+가설을 검증하려면 아래 확인이 필요합니다:
+1. [명령어] — 결과를 알려주세요
+2. [확인 방법] — 스크린샷 또는 출력값을 붙여주세요
+```
+
+**4. 결과 판정**
+
+```
+IF 검증 결과가 가설을 확인 (CONFIRMED):
+  → "가설 확인됨: [evidence]. STEP 5로 진행합니다."
+  → STEP 5 (Fix Application)
+
+IF 검증 결과가 가설을 반증 (DISPROVEN):
+  → "가설 반증됨: [why]. 다음 가설(#2)로 이동합니다."
+  → 다음 ranked hypothesis로 STEP 4.5 반복
+
+IF 모든 가설이 반증됨:
+  → "모든 가설이 반증되었습니다. 배제된 원인: [list]."
+  → 사용자에게 새 정보 요청 또는 /research 에스컬레이션
+
+IF 검증 불가 (런타임 접근 불가):
+  → "검증에 필요한 [resource]에 접근할 수 없습니다.
+     사용자가 [specific action]을 수행해야 합니다."
+  → 사용자 응답 대기
+```
+
+---
+
 ## STEP 5: Fix Application
 
-Based on investigation findings, apply the fix:
+Based on investigation findings, apply the fix.
+
+**GUARD:** IF `ENVIRONMENT-SUSPECT` tagged AND hypothesis NOT verified in STEP 4.5 → **STOP. Return to STEP 4.5.** Do not apply code fixes for runtime-state bugs without runtime verification.
 
 ```
 IF root cause is clear and fix is minimal:
