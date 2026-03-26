@@ -5,5 +5,8 @@
 .vscode/
 .idea/
 
-# Memory (local only)
+# Claude Code local
+.claude/skills/
+.claude/enriched/
+.claude/pipeline-state.md
 .claude/memory/
