@@ -167,39 +167,56 @@ Dispatch audit agents in parallel, each focused on a specific quality dimension:
 Agent 1 — SECURITY (vulnerability scan):
   subagent_type: "Explore"
   run_in_background: true
-  prompt: "Audit [implementation] for security issues:
-           - Grep for common vulnerabilities (eval, innerHTML, SQL concat, exec, subprocess with shell=True)
+  prompt: "Read CLAUDE.md first. Evaluate against project conventions.
+           Audit [implementation] for security vulnerabilities:
+           - Check for exploitable patterns (eval, innerHTML, SQL concat, exec, subprocess with shell=True)
+             Only report if the pattern is exploitable in context — safe wrappers, sanitized input, and
+             framework-provided escaping are NOT vulnerabilities.
            - Check auth implementation and session handling
            - Check input validation at system boundaries
-           - Check for secrets/credentials in code
-           Return: vulnerability list with file:line references and severity."
+           - Check for hardcoded secrets/credentials (ignore env var references, test fixtures, documentation)
+           IGNORE: test files, documentation files, comments explaining vulnerabilities, safe usage patterns.
+           Return: vulnerability list. Each finding MUST include file:line reference, code snippet,
+           and explanation of how it could be exploited. Findings without exploitability evidence → discard.
+           If no vulnerabilities found, return 'No security issues identified' with brief justification."
 
 Agent 2 — ARCHITECTURE & PERFORMANCE (structure + perf review):
   subagent_type: "Explore"
   run_in_background: true
-  prompt: "Review [implementation] architecture:
-           - Analyze code structure, coupling, cohesion, and maintainability
-           - Check for performance anti-patterns (N+1 queries, unbounded loops, memory leaks)
-           - Profile hot paths and resource usage patterns
-           - Compare implementation against research recommendations in docs/reports/
+  prompt: "Read CLAUDE.md first. Evaluate against project conventions, not generic standards.
+           Review [implementation] for structural defects:
+           - Check for performance defects that cause measurable impact (N+1 queries, unbounded loops, memory leaks)
            - Check resource cleanup (connections, file handles, event listeners)
-           Return: structural issues with improvement suggestions.
-           If no research report exists in docs/reports/, evaluate against
-           general architecture best practices for the tech stack.
-           Report 'No prior research — evaluated against general standards.'"
+           - Compare implementation against research recommendations in docs/reports/
+           Do NOT recommend architectural patterns the project has not adopted.
+           Do NOT flag coupling/cohesion without concrete evidence of a resulting defect.
+           If no research report exists in docs/reports/, read CLAUDE.md for project conventions
+           and flag only issues that violate stated patterns or would cause runtime failures.
+           Return: defect list. Each finding MUST include:
+             - file:line reference and code snippet
+             - concrete impact (what breaks, degrades, or becomes unmaintainable)
+           Findings without file:line evidence → discard.
+           Improvements without defect evidence → omit.
+           If no defects found, return 'No architectural/performance defects identified' with brief justification."
 
 Agent 3 — COMPLETENESS (spec alignment):
   subagent_type: "Explore"
   run_in_background: true
-  prompt: "Check [implementation] completeness:
+  prompt: "Read CLAUDE.md first. Evaluate against project conventions.
+           Check [implementation] completeness:
            - Compare against spec in docs/specs/ (if exists)
            - List features from spec that are missing or partial
-           - Check test coverage gaps
-           - Find all TODO/FIXME/HACK comments
-           Return: completeness percentage + gap list.
+           - Check test coverage gaps for critical paths
+           - Note TODO/FIXME/HACK counts as informational context only —
+             do NOT report as issues unless they indicate incomplete critical functionality.
+           Return: gap list. Each gap MUST include:
+             - spec section or requirement it traces to
+             - file where implementation should exist
+           Gaps that cannot cite a specific spec requirement or task description clause → discard.
            If no spec exists in docs/specs/, compare against the research
            synthesis in docs/reports/ or the original task description.
            Report 'No formal spec found — compared against [source].'
+           If no gaps found, return 'Implementation complete against [source]' with brief justification.
 ```
 
 **Agent dispatch rules:**
@@ -207,10 +224,16 @@ Agent 3 — COMPLETENESS (spec alignment):
 - Agent 3 (COMPLETENESS) only if spec or research report exists; skip for documentation-only or config-only changes
 - If implementation is non-code (markdown, config), skip SECURITY agent
 
+**Severity definitions (apply across all agents):**
+- **CRITICAL:** Runtime failure, security vulnerability, data loss risk
+- **IMPORTANT:** Performance degradation, maintainability issue, spec non-compliance
+- **MINOR:** Improvement possible but no impact on current behavior
+
 **After all agents complete:**
-- Reconcile findings across agents — note if agents found overlapping issues
-- If any agent returned empty results: note the gap in the assessment report
-- Prioritize findings by severity before compiling the report
+- Reconcile findings across agents — deduplicate overlapping issues
+- **Filter:** Discard findings without file:line evidence or concrete impact statement
+- If any agent returned empty results: this is valid. Do not treat empty results as a gap
+- Prioritize remaining findings by severity before compiling the report
 
 Save to `docs/reports/{topic}-validation-internal-findings.md`.
 
@@ -347,7 +370,7 @@ If `.claude/pipeline-state.md` exists, update it before concluding:
 
 ---## Anti-Patterns
 
-- **Rubber stamp**: "Looks good" without evidence — always find at least one improvement
+- **Rubber stamp**: "Looks good" without evidence — if no issues found, state "No issues identified in [dimension]" with specific justification for why the code passes. Empty findings are valid when supported by evidence of quality
 - **Style policing**: Focus on bugs/security/architecture, not formatting
 - **Full file dumps**: Include only relevant sections in the prompt
 - **No prior context**: Always reference what research recommended
@@ -355,3 +378,6 @@ If `.claude/pipeline-state.md` exists, update it before concluding:
 - **Ignoring internal audit**: Don't skip self-review just because external is coming
 - **Scoring without criteria**: Never assign X/10 without per-dimension justification — gut feelings are not assessments
 - **Reviewing against wrong baseline**: Validate against what was specified (spec/research), not personal preferences
+- **Context-free evaluation**: Never evaluate against "general best practices" without reading CLAUDE.md first. Project conventions override textbook patterns
+- **Evidence-free findings**: Every reported issue MUST have file:line reference + code snippet + concrete impact. Vague assertions like "coupling is too high" without pointing to specific code are false positives
+- **Forced finding quota**: Do NOT manufacture issues to avoid empty results. If code is clean, say so with justification
