@@ -64,9 +64,28 @@ npx knip --version 2>/dev/null || echo "⚠️ knip NOT available"
 ```
 
 - All available → proceed normally
-- ast-grep missing → degrade to rg + tsc only (confidence ceiling: 85%)
+- **ast-grep missing → auto-install, then re-check (아래 참조)**
 - tsc missing → ABORT ("tsc is required for verification. Install TypeScript first.")
 - knip missing → skip STEP 1, note in confidence
+
+### ast-grep Auto-Install
+
+ast-grep이 없으면 자동 설치를 시도한다. 수동 degradation 전에 반드시 이 단계를 거친다.
+
+```bash
+# 1. 설치 시도
+npm install -g @ast-grep/cli 2>/dev/null
+
+# 2. 재검증
+npx @ast-grep/cli --version 2>/dev/null
+```
+
+| 결과 | 행동 |
+|------|------|
+| 설치 성공 (재검증 통과) | 정상 진행. "ast-grep 자동 설치 완료." 로그 |
+| 설치 실패 (권한/네트워크) | degrade to rg + tsc only (confidence ceiling: 85%). "ast-grep 자동 설치 실패. rg + tsc 모드로 진행." |
+
+**npm install 실패 시 npx fallback:** `npm install -g`가 권한 문제로 실패하면, 이후 스캔에서 `npx @ast-grep/cli run ...` 명령이 자동으로 패키지를 캐싱하므로 별도 조치 불필요. 첫 실행만 느릴 수 있음.
 
 **ripgrep fallback:** If Grep tool fails during scan, fall back to:
 ```bash

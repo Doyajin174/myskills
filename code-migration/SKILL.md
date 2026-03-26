@@ -35,21 +35,40 @@ Replace system A with system B using scanner results as input. Leaf-first depend
 
 ## STEP 0: Read Scan Report
 
-Read the scan report from `/scanner`:
+**의존성:** 이 스킬은 `/scanner` 출력(scan-report.md)에 의존합니다. scan report 없이 실행할 수 없습니다.
+
+### 0a. Scan Report 존재 확인
+
 ```
 Scan for: docs/reports/*-scan-report.md
 ```
 
-Extract:
+**If no scan report exists → HARD STOP:**
+"⛔ 스캔 리포트가 없습니다. `/scanner`를 먼저 실행하세요. scan report 없이 마이그레이션을 진행하면 참조 누락으로 half-migrated 상태가 됩니다."
+→ 이후 단계 진행 불가. 사용자에게 `/scanner` 실행을 안내하고 종료.
+
+### 0b. Scan Report 구조 검증
+
+Report가 존재하면 필수 섹션 포함 여부를 확인:
+- [ ] `## Reference Map` — 없으면 HARD STOP
+- [ ] `## Dependency Graph` — 없으면 HARD STOP
+- [ ] `## Confidence Score` — 없으면 경고 후 진행 (ceiling 70% 가정)
+
+누락 시: "⛔ scan report에 [섹션명]이 없습니다. `/scanner`를 다시 실행하세요."
+
+### 0c. Scan Report Freshness 검증
+
+Check if files listed in the report still exist. If >10% are missing/moved → HARD STOP:
+"⛔ scan report가 현재 코드베이스와 10% 이상 불일치합니다. `/scanner`를 다시 실행하세요."
+
+### 0d. Extract
+
+Report가 모든 검증을 통과하면 추출:
 - **Reference Map** — all confirmed references with file:line:category
 - **Dependency Graph** — leaf-first ordering
 - **Dead Code** — files to delete (not migrate)
 - **Manual Verification Checklist** — items requiring human review
 - **Confidence Score** — overall scan completeness
-
-**If no scan report exists:** Route to `/scanner` first: "스캔 리포트가 없습니다. 먼저 /scanner로 레퍼런스를 찾아야 합니다."
-
-**Verify scan report freshness:** Check if files listed in the report still exist. If >10% are missing/moved, re-run scanner.
 
 ---
 

@@ -1,0 +1,9 @@
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Memory (local only)
+.claude/memory/
