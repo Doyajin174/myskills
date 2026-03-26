@@ -72,7 +72,27 @@ Evaluate across these dimensions:
 | **Maintainability** | Code clarity, modularity, naming, documentation |
 | **Robustness** | Error handling, reconnection, graceful degradation |
 | **Completeness** | Missing features from spec? Partial implementations? |
+| **User Experience** | Every failure path has user-visible feedback? No silent failures? User can recover from errors? See UX Checklist below |
 | **Best Practices** | Industry standards followed? Anti-patterns present? |
+
+### UX Checklist (UI가 있는 프로젝트에서 필수)
+
+아래 항목 중 하나라도 위반되면 IMPORTANT 이슈로 보고:
+
+1. **실패 경로에 사용자 피드백이 있는가?**
+   - `print()`/`console.log()`만 있고 UI 알림 없음 → 위반
+   - 조용히 `return`하고 사용자에게 아무 표시 없음 → 위반
+   - 서버 에러를 사용자에게 전달하지 않는 catch 블록 → 위반
+
+2. **사용자가 현재 상태를 알 수 있는가?**
+   - 로딩/성공/실패 상태가 UI에 구분 표시되는가
+   - "아무 반응 없음" 상태가 발생하지 않는가
+   - 비동기 작업(WebSocket, fetch) 실패 시 타임아웃 + 피드백이 있는가
+
+3. **사용자가 복구할 수 있는가?**
+   - 에러 후 재시도 가능한가
+   - 편집 중인 데이터가 에러로 사라지지 않는가
+   - 에러 메시지가 다음 행동을 안내하는가 ("다시 시도해주세요", "새로고침 필요")
 
 ---
 
@@ -217,12 +237,31 @@ Agent 3 — COMPLETENESS (spec alignment):
            synthesis in docs/reports/ or the original task description.
            Report 'No formal spec found — compared against [source].'
            If no gaps found, return 'Implementation complete against [source]' with brief justification.
+
+Agent 4 — USER EXPERIENCE (failure path audit) [UI가 있는 프로젝트에서만]:
+  subagent_type: "Explore"
+  run_in_background: true
+  prompt: "Read CLAUDE.md first. Check if this project has a UI (web, mobile, CLI with user interaction).
+           IF no UI → return 'No UI detected — UX audit skipped.'
+           IF UI exists → Audit [implementation] for user experience issues:
+           - Find all error/catch/failure paths: does each one provide user-visible feedback?
+             (print/console.log only = FAIL. Silent return = FAIL. Must have UI notification/toast/message)
+           - Check async operations (fetch, WebSocket, API calls): is there loading state + timeout + error feedback?
+           - Check error recovery: can the user retry? Is form data preserved on error? Is there a clear next step?
+           - Find 'silent failure' patterns: catch blocks that swallow errors without user notification.
+           Return: UX issue list. Each finding MUST include:
+             - file:line reference and code snippet
+             - what the user experiences (e.g., 'button does nothing', 'no error message shown')
+             - suggested fix (e.g., 'add toast notification', 'show error banner')
+           Findings without file:line evidence → discard.
+           If no UX issues found, return 'No UX issues identified' with brief justification."
 ```
 
 **Agent dispatch rules:**
 - Agent 1 (SECURITY) and Agent 2 (ARCHITECTURE) always dispatched
 - Agent 3 (COMPLETENESS) only if spec or research report exists; skip for documentation-only or config-only changes
-- If implementation is non-code (markdown, config), skip SECURITY agent
+- Agent 4 (USER EXPERIENCE) only if project has UI (web, mobile, CLI with user interaction); skip for libraries, backend-only, or config changes
+- If implementation is non-code (markdown, config), skip SECURITY and UX agents
 
 **Severity definitions (apply across all agents):**
 - **CRITICAL:** Runtime failure, security vulnerability, data loss risk
